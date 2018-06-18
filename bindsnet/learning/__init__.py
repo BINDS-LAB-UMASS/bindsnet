@@ -6,16 +6,16 @@ from ..utils import im2col_indices
 def post_pre(conn, **kwargs):
     '''
     Simple STDP rule involving both pre- and post-synaptic spiking activity.
-    
+
     Inputs:
-        
+
         | :code:`conn` (:code:`bindsnet.network.topology.AbstractConnection`):
         An instance of class :code:`AbstractAbstractConnectionConnection`.
     '''
     if not 'kernel_size' in conn.__dict__:
         x_source, x_target = conn.source.x.unsqueeze(-1), conn.target.x.unsqueeze(0)
         s_source, s_target = conn.source.s.float().unsqueeze(-1), conn.target.s.float().unsqueeze(0)
-        
+
         # Post-synaptic.
         conn.w += conn.nu_post * x_source * s_target
         # Pre-synaptic.
@@ -26,7 +26,7 @@ def post_pre(conn, **kwargs):
     else:
         out_channels, _, kernel_height, kernel_width = conn.w.size()
         padding, stride = conn.padding, conn.stride
-        
+
         x_source = im2col_indices(conn.source.x,
                                   kernel_height,
                                   kernel_width,
@@ -43,11 +43,11 @@ def post_pre(conn, **kwargs):
 
         s_target = conn.target.s.permute(1, 2, 3, 0).reshape(out_channels,
                                                              -1).float()
-        
+
         # Post-synaptic.
         post = s_target @ x_source.t()
         conn.w += conn.nu_post * post.view(conn.w.size())
-        
+
         # Pre-synaptic.
         pre = x_target @ s_source.t()
         conn.w -= conn.nu_pre * pre.view(conn.w.size())
@@ -58,9 +58,9 @@ def post_pre(conn, **kwargs):
 def hebbian(conn, **kwargs):
     '''
     Simple Hebbian learning rule. Pre- and post-synaptic updates are both positive.
-    
+
     Inputs:
-        
+
         | :code:`conn` (:code:`bindsnet.network.topology.AbstractConnection`):
         An instance of class :code:`AbstractConnection`.
     '''
@@ -75,7 +75,7 @@ def hebbian(conn, **kwargs):
     else:
         out_channels, _, kernel_height, kernel_width = conn.w.size()
         padding, stride = conn.padding, conn.stride
-        
+
         x_source = im2col_indices(conn.source.x,
                                   kernel_height,
                                   kernel_width,
@@ -92,19 +92,19 @@ def hebbian(conn, **kwargs):
 
         s_target = conn.target.s.permute(1, 2, 3, 0).reshape(out_channels,
                                                              -1).float()
-        
+
         # Post-synaptic.
         post = (x_source @ s_target.t()).view(conn.w.size())
         if post.max() > 0:
             post = post / post.max()
-        
+
         conn.w += conn.nu_post * post
-        
+
         # Pre-synaptic.
         pre = (s_source @ x_target.t()).view(conn.w.size())
         if pre.max() > 0:
             pre = pre / pre.max()
-        
+
         conn.w += conn.nu_pre * pre
 
         # Bound weights.
@@ -115,9 +115,9 @@ def m_stdp(conn, **kwargs):
     '''
     Reward-modulated STDP. Adapted from
     `(Florian 2007) <https://florian.io/papers/2007_Florian_Modulated_STDP.pdf>`_.
-    
+
     Inputs:
-        
+
         | :code:`conn` (:code:`bindsnet.network.topology.AbstractConnection`):
         An instance of class :code:`AbstractConnection`.
     '''
@@ -129,7 +129,7 @@ def m_stdp(conn, **kwargs):
 
     a_plus = kwargs.get('a_plus', 1)
     a_minus = kwargs.get('a_plus', -1)
-    
+
     if not 'kernel_size' in conn.__dict__:
         # Get P^+ and P^- values (function of firing traces).
         p_plus = a_plus * conn.source.x.unsqueeze(-1)
@@ -150,13 +150,13 @@ def m_stdp(conn, **kwargs):
     else:
         out_channels, _, kernel_height, kernel_width = conn.w.size()
         padding, stride = conn.padding, conn.stride
-        
+
         p_plus = a_plus * im2col_indices(conn.source.x,
                                          kernel_height,
                                          kernel_width,
                                          padding=padding,
                                          stride=stride)
-        
+
         p_minus = a_minus * conn.target.x.permute(1, 2, 3, 0).reshape(out_channels,
                                                                       -1)
         pre_fire = im2col_indices(conn.source.s,
@@ -167,12 +167,12 @@ def m_stdp(conn, **kwargs):
 
         post_fire = conn.target.s.permute(1, 2, 3, 0).reshape(out_channels,
                                                               -1).float()
-        
+
         # Post-synaptic.
         post = (p_plus @ post_fire.t()).view(conn.w.size())
         if post.max() > 0:
             post = post / post.max()
-        
+
         # Pre-synaptic.
         pre = (pre_fire @ p_minus.t()).view(conn.w.size())
         if pre.max() > 0:
@@ -180,10 +180,10 @@ def m_stdp(conn, **kwargs):
 
         # Calculate point eligibility value.
         eligibility = post + pre
-        
+
         # Compute weight update.
         conn.w += conn.nu * reward * eligibility
-            
+
         # Bound weights.
         conn.w = torch.clamp(conn.w,
                              conn.wmin,
@@ -194,14 +194,14 @@ def m_stdp_et(conn, **kwargs):
     '''
     Reward-modulated STDP with eligibility trace. Adapted from
     `(Florian 2007) <https://florian.io/papers/2007_Florian_Modulated_STDP.pdf>`_.
-    
+
     Inputs:
-        
+
         | :code:`conn` (:code:`bindsnet.network.topology.AbstractConnection`):
         An instance of class :code:`AbstractConnection`.
-        
+
         | Keyword arguments:
-            
+
             | :code:`a_plus` (:code:`int`): Learning rate (positive).
             | :code:`a_minus` (:code:`int`): Learning rate (negative).
     '''
@@ -235,7 +235,7 @@ def m_stdp_et(conn, **kwargs):
     else:
         out_channels, _, kernel_height, kernel_width = conn.w.size()
         padding, stride = conn.padding, conn.stride
-        
+
         p_plus = a_plus * im2col_indices(conn.source.x,
                                          kernel_height,
                                          kernel_width,
@@ -252,12 +252,12 @@ def m_stdp_et(conn, **kwargs):
 
         post_fire = conn.target.s.permute(1, 2, 3, 0).reshape(out_channels,
                                                               -1).float()
-        
+
         # Post-synaptic.
         post = (p_plus @ post_fire.t()).view(conn.w.size())
         if post.max() > 0:
             post = post / post.max()
-        
+
         # Pre-synaptic.
         pre = (pre_fire @ p_minus.t()).view(conn.w.size())
         if pre.max() > 0:
@@ -265,11 +265,50 @@ def m_stdp_et(conn, **kwargs):
 
         # Calculate point eligibility value.
         conn.e_trace += -(conn.tc_e_trace * conn.e_trace) + (post + pre)
-        
+
         # Compute weight update.
         conn.w += conn.nu * reward * conn.e_trace
-            
+
         # Bound weights.
         conn.w = torch.clamp(conn.w,
                              conn.wmin,
                              conn.wmax)
+
+def sensitize(conn, **kwargs):
+  '''
+  Update rule that changes the weights inversely proportional to the spiking activity.
+
+  Inputs:
+
+    | :code:`conn` (:code:`bindsnet.network.topology.AbstractConnection`):
+    An instance of class :code:`AbstractAbstractConnectionConnection`.
+  '''
+  s_source = conn.source.s.float()
+  temp = s_source * -0.01
+  temp[temp == 0] = 0.01
+
+  temp = temp.view(-1).unsqueeze(-1)
+  conn.sensitize_multiplier = conn.sensitize_multiplier + temp
+  # bound the multiplier
+  conn.sensitize_multiplier = torch.clamp(conn.sensitize_multiplier, conn.sensitize_floor, conn.sensitize_roof)
+
+  conn.w = conn.sensitize_multiplier * conn.ref_w
+
+def gradient_descent(conn, **kwargs):
+    '''
+    Simple gradient descent for changing weights according to loss.
+
+     Inputs:
+
+       | :code:`conn` (:code:`bindsnet.network.topology.AbstractConnection`):
+       An instance of class :code:`AbstractAbstractConnectionConnection`.
+
+       | Keyword arguments:
+
+           | :code:`loss` (:code:`float`): Loss (non-negative).
+           | :code:`input_spikes` (:code:`torch.Tensor`): Spike input to the layer.
+    '''
+    loss = kwargs.get('loss', 0)
+    input_spikes = kwargs.get('input_spikes', 0)
+    input_spikes = input_spikes.float().view(-1)
+    conn.w += conn.nu * input_spikes * loss
