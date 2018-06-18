@@ -1,6 +1,7 @@
 import os
 import sys
 import gym
+from gym import wrappers
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,9 +18,9 @@ class DatasetEnvironment:
     def __init__(self, dataset, train=True, time=350, **kwargs):
         '''
         Initializes the environment wrapper around the dataset.
-        
+
         Inputs:
-        
+
             | :code:`dataset` (:code:`bindsnet.dataset.Dataset`): Object from datasets module.
             | :code:`train` (:code:`bool`): Whether to use train or test dataset.
             | :code:`time` (:code:`time`): Length of spike train per example.
@@ -28,29 +29,29 @@ class DatasetEnvironment:
         self.dataset = dataset
         self.train = train
         self.time = time
-        
+
         # Keyword arguments.
         self.intensity = kwargs.get('intensity', 1)
         self.max_prob = kwargs.get('max_prob', 1)
-        
+
         assert self.max_prob > 0 and self.max_prob <= 1, \
             'Maximum spiking probability must be in (0, 1].'
-        
+
         if train:
             self.data, self.labels = self.dataset.get_train()
             self.label_loader = iter(self.labels)
         else:
             self.data, self.labels = self.dataset.get_test()
             self.label_loader = iter(self.labels)
-        
+
         self.env = iter(self.data)
-    
+
     def step(self, a=None):
         '''
         Dummy function for OpenAI Gym environment's :code:`step()` function.
-        
+
         Inputs:
-        
+
             | :code:`a` (:code:`None`): There is no interaction of the network the dataset.
 
         Returns:
@@ -68,15 +69,15 @@ class DatasetEnvironment:
             self.env = iter(data)
             self.label_loader = iter(self.labels)
             self.obs = next(self.env)
-        
+
         # Preprocess observation.
         self.preprocess()
-        
+
         # Info dictionary contains label of MNIST digit.
         info = {'label' : next(self.label_loader)}
-        
+
         return self.obs, 0, False, info
-    
+
     def reset(self):
         '''
         Dummy function for OpenAI Gym environment's :code:`reset()` function.
@@ -84,7 +85,7 @@ class DatasetEnvironment:
         # Reload data and label generators.
         self.env = iter(self.data)
         self.label_loader = iter(self.labels)
-    
+
     def render(self):
         '''
         Dummy function for OpenAI Gym environment's :code:`render()` function.
@@ -96,20 +97,20 @@ class DatasetEnvironment:
         Dummy function for OpenAI Gym environment's :code:`close()` function.
         '''
         pass
-    
+
     def preprocess(self):
         '''
         Preprocessing step for a state specific to dataset objects.
         '''
         self.obs = self.obs.view(-1)
         self.obs *= self.intensity
-    
+
     def reshape(self):
         '''
         Reshaped observation for plotting purposes.
-        
+
         Returns:
-        
+
             | (:code:`torch.Tensor`): Reshaped observation to plot in :code:`plt.imshow()` call.
         '''
         if type(self.dataset) == MNIST:
@@ -136,11 +137,14 @@ class GymEnvironment:
         '''
         self.name = name
         self.env = gym.make(name)
+        experiment_dir = os.path.abspath("./experiments/{}".format(self.env.spec.id))
+        monitor_path = os.path.join(experiment_dir, "monitor")
+        self.env = wrappers.Monitor(self.env, directory=monitor_path, video_callable=lambda count: count % 100 == 0, resume=True)
         self.action_space = self.env.action_space
-        
+
         # Keyword arguments.
         self.max_prob = kwargs.get('max_prob', 1)
-        
+
         assert self.max_prob > 0 and self.max_prob <= 1, \
             'Maximum spiking probability must be in (0, 1].'
 
@@ -161,6 +165,7 @@ class GymEnvironment:
         '''
         # Call gym's environment step function.
         self.obs, self.reward, done, info = self.env.step(a)
+        self.reward = np.sign(self.reward)
         self.preprocess()
 
         # Return converted observations and other information.
@@ -177,7 +182,7 @@ class GymEnvironment:
         # Call gym's environment reset function.
         self.obs = self.env.reset()
         self.preprocess()
-        
+
         return self.obs
 
     def render(self):
@@ -203,18 +208,21 @@ class GymEnvironment:
             self.obs = subsample(gray_scale(self.obs), 84, 110)
             self.obs = self.obs[26:104, :]
             self.obs = binary_image(self.obs)
+        elif self.name == 'BreakoutDeterministic-v4':
+            self.obs = subsample(gray_scale(crop(self.obs, 34, 194, 0, 160)), 80, 80)
+            self.obs = binary_image(self.obs)
         else: # Default pre-processing step
             self.obs = subsample(gray_scale(self.obs), 84, 110)
             self.obs = binary_image(self.obs)
-            
+
         self.obs = torch.from_numpy(self.obs).float()
-        
+
     def reshape(self):
         '''
         Reshape observation for plotting purposes.
 
         Returns:
-        
+
             | (:code:`torch.Tensor`): Reshaped observation to plot in :code:`plt.imshow()` call.
         '''
         return self.obs
