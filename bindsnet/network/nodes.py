@@ -249,15 +249,15 @@ class LIFNodes(Nodes):
         # Decrement refrac counters.
         self.refrac_count[self.refrac_count != 0] -= dt
 
+        # Integrate inputs.
+        self.v += (self.refrac_count == 0).float() * inpts
+
         # Check for spiking neurons.
         self.s = self.v >= self.thresh
 
         # Refractoriness and voltage reset.
         self.refrac_count.masked_fill_(self.s, self.refrac)
         self.v.masked_fill_(self.s, self.reset)
-
-        # Integrate inputs.
-        self.v += (self.refrac_count == 0).float() * inpts
 
         super().step(inpts, dt)
 
@@ -570,6 +570,9 @@ class DiehlAndCookNodes(Nodes):
         # Decrement refractory counters.
         self.refrac_count[self.refrac_count != 0] -= dt
 
+        # Integrate inputs.
+        self.v += (self.refrac_count == 0).float() * inpts
+
         # Check for spiking neurons.
         self.s = (self.v >= self.thresh + self.theta)
 
@@ -584,9 +587,6 @@ class DiehlAndCookNodes(Nodes):
             s = s.view(-1)
             s[torch.multinomial(self.s.float().view(-1), 1)] = 1
             self.s = s.view(self.s.size()).byte()
-
-        # Integrate inputs.
-        self.v += (self.refrac_count  == 0).float() * inpts
 
         super().step(inpts, dt)
 

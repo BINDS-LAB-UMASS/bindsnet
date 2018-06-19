@@ -158,6 +158,7 @@ class Network:
         '''
         p.dump(self, open(fname, 'wb'))
 
+
     def get_inputs(self):
         '''
         Fetches outputs from network layers for input to downstream layers.
@@ -171,8 +172,10 @@ class Network:
         # Loop over network connections.
         for c in self.connections:
             # Fetch source and target populations.
+
             source = self.connections[c].source
             target = self.connections[c].target
+
             
             if not c[1] in inpts:
                 inpts[c[1]] = torch.zeros(target.shape)
@@ -232,29 +235,52 @@ class Network:
         # Effective number of timesteps
         timesteps = int(time / self.dt)
 
-        # Get input to all layers.
-        inpts.update(self.get_inputs())
-        
+
+        # Get input layer name and the input tensor
+        input_layer_name = list(filter(lambda x: type(self.layers[x]) is Input, self.layers))[0]
+        X = inpts[input_layer_name]
+
         # Simulate network activity for `time` timesteps.
         for t in range(timesteps):
             # Update each layer of nodes.
-            for l in self.layers:
-                if type(self.layers[l]) is Input:
-                    self.layers[l].step(inpts[l][t, :], self.dt)
-                else:
-                    self.layers[l].step(inpts[l], self.dt)
-                
-                # Force neurons to spike.
-                clamp = clamps.get(l, None)
+
+            # Get input to all layers.
+            #layer_inputs = self.get_inputs(X[t, :])
+
+            for key in self.connections:
+                # Fetch source and target populations.
+                source = self.connections[key].source
+                target = self.connections[key].target
+
+                if type(source) is Input:
+                    source.step(X[t, :].byte(), self.dt)
+
+                clamp = clamps.get(source, None)
+
                 if clamp is not None:
-                    self.layers[l].s[clamp] = 1
+                    source.s[clamp] = 1
+
+                target_update = self.connections[key].compute(source.s)
+                target.step(target_update, self.dt)
+
+
+
+
+            # for l in self.layers:
+            #     if type(self.layers[l]) is not Input:
+            #         self.layers[l].step(layer_inputs[l], self.dt)
+            #
+            #     # Force neurons to spike.
+            #     clamp = clamps.get(l, None)
+            #     if clamp is not None:
+            #         self.layers[l].s[clamp] = 1
 
             # Run synapse updates.
             for c in self.connections:
                 self.connections[c].update(reward=reward)
 
             # Get input to all layers.
-            inpts.update(self.get_inputs())
+            #inpts.update(self.get_inputs())
 
             # Record state variables of interest.
             for m in self.monitors:
