@@ -74,7 +74,7 @@ class AbstractConnection(ABC):
         reward = kwargs.get('reward', None)
 
         if self.update_rule is not None:
-            self.update_rule(self, reward=reward)
+            self.update_rule(self, **kwargs)
 
     @abstractmethod
     def normalize(self):
@@ -123,7 +123,7 @@ class Connection(AbstractConnection):
             if self.wmin == -np.inf or self.wmax == np.inf:
                 self.w = torch.rand(*source.shape, *target.shape)
             else:
-                self.w = self.wmin + torch.rand(*source.shape, *target.shape) * (self.wmin - self.wmin)
+                self.w = self.wmin + torch.rand(*source.shape, *target.shape) * (self.wmax - self.wmin)
         else:
             if torch.max(self.w) > self.wmax or torch.min(self.w) < self.wmin:
                 warnings.warn(f'Weight matrix will be clamped between [{self.wmin}, {self.wmax}]')

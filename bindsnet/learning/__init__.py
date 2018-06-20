@@ -309,6 +309,9 @@ def gradient_descent(conn, **kwargs):
            | :code:`input_spikes` (:code:`torch.Tensor`): Spike input to the layer.
     '''
     loss = kwargs.get('loss', 0)
-    input_spikes = kwargs.get('input_spikes', 0)
-    input_spikes = input_spikes.float().view(-1)
-    conn.w += conn.nu * input_spikes * loss
+    input_spikes = kwargs.get('input_spikes')
+    action = kwargs.get('action', 0)
+    input_spikes = input_spikes.float().view(-1, 1)
+    target = torch.zeros_like(conn.target.s).float().view(1, -1)
+    target[0, 100 * action: 100 * action + 100] = 1
+    conn.w += conn.nu * loss.float() * (input_spikes @ target)

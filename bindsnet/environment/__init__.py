@@ -1,7 +1,6 @@
 import os
 import sys
 import gym
-from gym import wrappers
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -137,9 +136,6 @@ class GymEnvironment:
         '''
         self.name = name
         self.env = gym.make(name)
-        experiment_dir = os.path.abspath("./experiments/{}".format(self.env.spec.id))
-        monitor_path = os.path.join(experiment_dir, "monitor")
-        self.env = wrappers.Monitor(self.env, directory=monitor_path, video_callable=lambda count: count % 100 == 0, resume=True)
         self.action_space = self.env.action_space
 
         # Keyword arguments.
