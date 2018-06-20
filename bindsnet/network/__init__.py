@@ -232,30 +232,46 @@ class Network:
 
         # Effective number of timesteps
         timesteps = int(time / self.dt)
+        # Get input to all layers.
+        # inpts.update(self.get_inputs())
+
+        input = inpts['X']
 
         # Simulate network activity for `time` timesteps.
         for t in range(timesteps):
             # Update each layer of nodes.
-            for key in self.connections:
-                # Fetch source and target populations.
-                source = self.connections[key].source
-                target = self.connections[key].target
-                self.layers[key[0]].step(input, self.dt)
-                clamp = clamps.get(key[0], None)
+            for c in self.connections:
+                if type(self.layers[c[0]]) is Input:
+                    self.layers[c[0]].step(input[t, :], self.dt)
+                    clamp = clamps.get(c[0], None)
+                    if clamp is not None:
+                        self.layers[c[0]].s[clamp] = 1
+
+                self.layers[c[1]].step(self.connections[c].compute(self.layers[c[0]].s), self.dt)
+                clamp = clamps.get(c[1], None)
                 if clamp is not None:
-                    self.layers[key[0]].s[clamp] = 1
+                    self.layers[c[1]].s[clamp] = 1
+                self.connections[c].update(reward=reward)
 
-                # Add to input: source's spikes multiplied by connection weights.
-                input = self.connections[key].compute(source.s)
+                if type(self.layers[c[0]]) is Input:
+                    temp = self.layers[c[1]].s
+                elif c[1] == 'Ae':
+                    self.layers[c[1]].s = temp
 
-            self.layers[key[1]].step(input, self.dt)
-            clamp = clamps.get(key[1], None)
-            if clamp is not None:
-                self.layers[key[1]].s[clamp] = 1
+            # for l in self.layers:
+            #     if type(self.layers[l]) is Input:
+            #         self.layers[l].step(inpts[l][t, :], self.dt)
+            #     else:
+            #         self.layers[l].step(inpts[l], self.dt)
+            #
+            #     # Force neurons to spike.
+            #     clamp = clamps.get(l, None)
+            #     if clamp is not None:
+            #         self.layers[l].s[clamp] = 1
 
             # Run synapse updates.
-            for c in self.connections:
-                self.connections[c].update(reward=reward)
+            # for c in self.connections:
+            #     self.connections[c].update(reward=reward)
 
             # Record state variables of interest.
             for m in self.monitors:
