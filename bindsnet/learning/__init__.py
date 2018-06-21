@@ -315,3 +315,4 @@ def gradient_descent(conn, **kwargs):
     target = torch.zeros_like(conn.target.s).float().view(1, -1)
     target[0, 100 * action: 100 * action + 100] = 1
     conn.w += conn.nu * loss.float() * (input_spikes @ target)
+    conn.w = torch.clamp(conn.w, min=conn.wmin)

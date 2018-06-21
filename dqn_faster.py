@@ -71,7 +71,7 @@ layers = {'X': inpt, 'E': exc, 'R': readout}
 input_exc_conn = Connection(source=layers['X'], target=layers['E'], wmin=0, wmax=1)
 
 # Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], wmin=0, wmax=1, update_rule=gradient_descent, nu=1e-2)
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'], wmin=0, wmax=1, update_rule=gradient_descent, nu=1e-4)
 
 
 # Inhibitory connection
@@ -99,9 +99,6 @@ for layer in set(network.layers):
     spikes[layer] = Monitor(network.layers[layer], state_vars=['s'], time=runtime)
     network.add_monitor(spikes[layer], name='%s_spikes' % layer)
 
-
-target_network = Network(dt=dt)
-
 # Load SpaceInvaders environment.
 environment = GymEnvironment('BreakoutDeterministic-v4')
 
@@ -112,27 +109,7 @@ replay_memory = deque(maxlen=replay_memory_size)
 # The epsilon decay schedule
 epsilons = np.linspace(epsilon_start, epsilon_end, epsilon_decay_steps)
 
-print("Populating replay memory...")
-
-obs = environment.reset()
-state = obs
-for i in range(replay_memory_init_size):
-    action = np.random.choice(np.arange(total_actions))
-    next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
-    next_state = torch.clamp(next_obs - obs, min=0)
-    replay_memory.append(Transition(state, action, reward, next_state, done))
-    if done:
-        state = environment.reset()
-        obs = state
-    else:
-        state = next_state
-        obs = next_obs
-
-print("Done Populating replay memory.")
-
-def policy(rspikes, eps):
-    q_values = torch.Tensor([rspikes[(i * action_pop_size):(i * action_pop_size) + action_pop_size].sum()
-                               for i in range(total_actions)])
+def policy(q_values, eps):
     A = np.ones(4, dtype=float) * eps / 4
     best_action = np.argmax(q_values)
     A[best_action] += (1.0 - eps)
@@ -166,91 +143,56 @@ for i_episode in range(num_episodes):
     state = environment.reset()
     obs = state
     loss = None
+    prev_q = None
     # One step in the environment
     for t in itertools.count():
-        # Maybe update the target estimator
-        if total_t % update_target_estimator_every == 0:
-            target_network.copy(network)
-            print("\nCopied model parameters to target network.")
-
-        print("\rStep {} ({}) @ Episode {}/{}, loss: {}".format(
-            t, total_t, i_episode + 1, num_episodes, loss), end="")
+        print("\rStep {} ({}) @ Episode {}/{}, loss: {}".format(t, total_t, i_episode + 1, num_episodes, loss), end="")
         sys.stdout.flush()
+        epsilon = epsilons[min(total_t, epsilon_decay_steps - 1)]
+        encoded_state = bernoulli(state, runtime)
+        inpts = {'X': encoded_state}
+        hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
+        q_values = torch.Tensor([readout_spikes[(i * action_pop_size):(i * action_pop_size) + action_pop_size].sum()
+                                 for i in range(total_actions)])
+        action_probs = policy(q_values, epsilon)
+        action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+        next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
+        next_state = torch.clamp(next_obs - obs, min=0)
+        episode_rewards[i_episode] += reward
 
-        for _ in range(4):
-            epsilon = epsilons[min(total_t, epsilon_decay_steps - 1)]
-            encoded_state = bernoulli(state, runtime)
-            inpts = {'X': encoded_state}
-            hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
-            action_probs = policy(readout_spikes, epsilon)
-            action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-            next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
-            next_state = torch.clamp(next_obs - obs, min=0)
-            replay_memory.append(Transition(state, action, reward, next_state, done))
-            episode_rewards[i_episode] += reward
-
-            if plot:
-                # Get voltage recording.
-                exc_voltages = exc_voltage_monitor.get('v')
-                readout_voltages = readout_voltage_monitor.get('v')
-                voltages = {'E': exc_voltages, 'R': readout_voltages}
-                inpt = encoded_state.view(runtime, 6400).sum(0).view(80, 80)
-                spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes}, ims=spike_ims, axes=spike_axes)
-                inpt_axes, inpt_ims = plot_input(state, inpt,axes=inpt_axes, ims=inpt_ims)
-                voltage_ims, voltage_axes = plot_voltages(voltages, ims=voltage_ims, axes=voltage_axes)
-                plt.pause(1e-8)
-
+        if prev_q is not None:
+            target = prev_reward + discount_factor * torch.max(q_values)
+            loss = target.float() - prev_q.float()
+            exc_readout_conn.update(loss=loss, input_spikes=prev_hidden_spikes, action=prev_action)
 
             if done:
-                break
-
-            state = next_state
-            obs = next_obs
+                loss = reward - q_values[action]
+                exc_readout_conn.update(loss=loss, input_spikes=hidden_spikes, action=action)
 
 
+        if plot:
+            # Get voltage recording.
+            exc_voltages = exc_voltage_monitor.get('v')
+            readout_voltages = readout_voltage_monitor.get('v')
+            voltages = {'E': exc_voltages, 'R': readout_voltages}
+            inpt = encoded_state.view(runtime, 6400).sum(0).view(80, 80)
+            spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes}, ims=spike_ims, axes=spike_axes)
+            inpt_axes, inpt_ims = plot_input(state, inpt,axes=inpt_axes, ims=inpt_ims)
+            voltage_ims, voltage_axes = plot_voltages(voltages, ims=voltage_ims, axes=voltage_axes)
+            plt.pause(1e-8)
 
+
+        prev_action = action
+        prev_hidden_spikes = hidden_spikes
+        prev_reward = reward
+        prev_q = q_values[action]
+        state = next_state
+        obs = next_obs
         episode_lengths[i_episode] = t
-        samples = random.sample(replay_memory, batch_size)
-
-        for sample in samples:
-            sample_state, sample_action, sample_reward, sample_next_state, sample_done = sample
-            encoded_sample_state = bernoulli(sample_state, runtime)
-            sample_inpts = {'X': encoded_sample_state}
-            hidden_spikes, sample_readout_spikes = network.run(inpts=sample_inpts, time=runtime)
-            q_value = torch.sum(sample_readout_spikes[action_pop_size * action: action_pop_size * action + action_pop_size])
-
-            if plot:
-                # Get voltage recording.
-                exc_voltages = exc_voltage_monitor.get('v')
-                readout_voltages = readout_voltage_monitor.get('v')
-                voltages = {'E': exc_voltages, 'R': readout_voltages}
-                inpt = encoded_state.view(runtime, 6400).sum(0).view(80, 80)
-                spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes}, ims=spike_ims, axes=spike_axes)
-                inpt_axes, inpt_ims = plot_input(state, inpt,axes=inpt_axes, ims=inpt_ims)
-                voltage_ims, voltage_axes = plot_voltages(voltages, ims=voltage_ims, axes=voltage_axes)
-                plt.pause(1e-8)
-
-
-            if sample_done:
-                loss = sample_reward - q_value
-            else:
-                encoded_next_state = bernoulli(sample_next_state, runtime)
-                next_inpts = {'X': encoded_next_state}
-                _, target_readout_spikes = target_network.run(inpts=sample_inpts, time=runtime)
-                target_q_values = torch.Tensor([target_readout_spikes[(i * action_pop_size):(i * action_pop_size) + action_pop_size].sum()
-                               for i in range(total_actions)])
-                target = sample_reward + discount_factor * torch.max(target_q_values)
-                loss = target.float() - q_value.float()
-
-            if plot:
-                spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes},ims=spike_ims, axes=spike_axes)
-                plt.pause(1e-8)
-            exc_readout_conn.update(loss=loss, input_spikes=hidden_spikes, action=sample_action)
-
         total_t += 1
 
         if done:
-            print("\nEpisode Reward: {}".format(episode_rewards[-1]))
+            print("\nEpisode Reward: {}".format(episode_rewards[i_episode]))
             break
 
 
