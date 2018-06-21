@@ -252,7 +252,7 @@ for i_episode in range(num_episodes):
         total_t += 1
 
         if done:
-            print("\nEpisode Reward: {}".format(episode_rewards[-1]))
+            print("\nEpisode Reward: {}".format(episode_rewards[i_episode]))
             break
 
 
