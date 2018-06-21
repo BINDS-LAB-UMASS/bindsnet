@@ -162,7 +162,7 @@ for i_episode in range(num_episodes):
 
         if prev_q is not None:
             target = prev_reward + discount_factor * torch.max(q_values)
-            loss = target.float() - prev_q.float()
+            loss = target.type(torch.cuda.FloatTensor) - prev_q.type(torch.cuda.FloatTensor)
             exc_readout_conn.update(loss=loss, input_spikes=prev_hidden_spikes, action=prev_action)
 
             if done:

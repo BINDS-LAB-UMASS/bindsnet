@@ -18,7 +18,7 @@ import io
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--dt', type=float, default=1.0)
-parser.add_argument('--runtime', type=int, default=350)
+parser.add_argument('--runtime', type=int, default=100)
 parser.add_argument('--render_interval', type=int, default=None)
 parser.add_argument('--plot_interval', type=int, default=None)
 parser.add_argument('--plot', dest='plot', action='store_true')
@@ -54,8 +54,10 @@ locals().update(vars(parser.parse_args()))
 if gpu:
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
     torch.cuda.manual_seed_all(seed)
+    dtype = torch.cuda.FloatTensor
 else:
     torch.manual_seed(seed)
+    dtype = torch.FloatTensor
 
 # Build network.
 network = Network(dt=dt)
@@ -71,7 +73,7 @@ layers = {'X': inpt, 'E': exc, 'R': readout}
 input_exc_conn = Connection(source=layers['X'], target=layers['E'], wmin=0, wmax=1)
 
 # Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], wmin=0, wmax=1, update_rule=gradient_descent, nu=1e-2)
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'], wmin=0, wmax=1, update_rule=gradient_descent, nu=1e-4)
 
 
 # Inhibitory connection
@@ -240,7 +242,7 @@ for i_episode in range(num_episodes):
                 target_q_values = torch.Tensor([target_readout_spikes[(i * action_pop_size):(i * action_pop_size) + action_pop_size].sum()
                                for i in range(total_actions)])
                 target = sample_reward + discount_factor * torch.max(target_q_values)
-                loss = target.float() - q_value.float()
+                loss = target.type(dtype) - q_value.type(dtype)
 
             if plot:
                 spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes},ims=spike_ims, axes=spike_axes)
