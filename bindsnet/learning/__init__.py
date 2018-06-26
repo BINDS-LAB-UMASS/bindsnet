@@ -310,9 +310,10 @@ def gradient_descent(conn, **kwargs):
     '''
     loss = kwargs.get('loss', 0)
     input_spikes = kwargs.get('input_spikes')
+    readout_spikes = kwargs.get('readout_spikes')
     action = kwargs.get('action', 0)
     input_spikes = input_spikes.float().view(-1, 1)
-    target = torch.zeros_like(conn.target.s).float().view(1, -1)
-    target[0, 100 * action: 100 * action + 100] = 1
+    target = torch.zeros_like(readout_spikes).float().view(1, -1)
+    target[0, 100 * action: 100 * action + 100] = readout_spikes[100 * action: 100 * action + 100]
     conn.w += conn.nu * loss.type(torch.cuda.FloatTensor) * (input_spikes @ target)
     conn.w = torch.clamp(conn.w, min=conn.wmin)

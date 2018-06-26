@@ -283,8 +283,8 @@ class Network:
                 self.monitors[m].record()
 
         # Re-normalize connections.
-        for c in self.connections:
-            self.connections[c].normalize()
+        # for c in self.connections:
+        #     self.connections[c].normalize()
 
         return hidden_spikes, readout_spikes
 

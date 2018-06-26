@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from gym import wrappers
 
 from bindsnet                import *
-from time                    import sleep
+import time
 from timeit                  import default_timer
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from collections             import deque, namedtuple
@@ -73,7 +73,7 @@ layers = {'X': inpt, 'E': exc, 'R': readout}
 input_exc_conn = Connection(source=layers['X'], target=layers['E'], wmin=0, wmax=1)
 
 # Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], wmin=0, wmax=1, update_rule=gradient_descent, nu=1e-4)
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'], wmin=0, wmax=1, update_rule=gradient_descent, nu=1e-5, norm=100)
 
 
 # Inhibitory connection
@@ -117,15 +117,16 @@ epsilons = np.linspace(epsilon_start, epsilon_end, epsilon_decay_steps)
 print("Populating replay memory...")
 
 obs = environment.reset()
-state = obs
+state = torch.stack([obs] * 4, dim=2)
 for i in range(replay_memory_init_size):
     action = np.random.choice(np.arange(total_actions))
     next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
     next_state = torch.clamp(next_obs - obs, min=0)
+    next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
     replay_memory.append(Transition(state, action, reward, next_state, done))
     if done:
-        state = environment.reset()
-        obs = state
+        obs = environment.reset()
+        state = torch.stack([obs] * 4, dim=2)
     else:
         state = next_state
         obs = next_obs
@@ -148,8 +149,8 @@ experiment_dir = os.path.abspath("./experiments/{}".format(environment.env.spec.
 monitor_path = os.path.join(experiment_dir, "monitor")
 environment.env = wrappers.Monitor(environment.env, directory=monitor_path, video_callable=lambda count: count % 100 == 0, resume=True)
 
-state = environment.reset()
-obs = state
+obs = environment.reset()
+state = obs
 
 
 # Get voltage recording.
@@ -165,8 +166,8 @@ if plot:
     plt.pause(1e-8)
 
 for i_episode in range(num_episodes):
-    state = environment.reset()
-    obs = state
+    obs = environment.reset()
+    state = torch.stack([obs] * 4, dim=2)
     loss = None
     # One step in the environment
     for t in itertools.count():
@@ -179,15 +180,17 @@ for i_episode in range(num_episodes):
             t, total_t, i_episode + 1, num_episodes, loss), end="")
         sys.stdout.flush()
 
+
         for _ in range(4):
             epsilon = epsilons[min(total_t, epsilon_decay_steps - 1)]
-            encoded_state = bernoulli(state, runtime)
+            encoded_state = bernoulli(torch.sum(state, dim=2), runtime)
             inpts = {'X': encoded_state}
             hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
             action_probs = policy(readout_spikes, epsilon)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
             next_state = torch.clamp(next_obs - obs, min=0)
+            next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
             replay_memory.append(Transition(state, action, reward, next_state, done))
             episode_rewards[i_episode] += reward
 
@@ -209,14 +212,12 @@ for i_episode in range(num_episodes):
             state = next_state
             obs = next_obs
 
-
-
         episode_lengths[i_episode] = t
         samples = random.sample(replay_memory, batch_size)
 
         for sample in samples:
             sample_state, sample_action, sample_reward, sample_next_state, sample_done = sample
-            encoded_sample_state = bernoulli(sample_state, runtime)
+            encoded_sample_state = bernoulli(torch.sum(sample_state, dim=2), runtime)
             sample_inpts = {'X': encoded_sample_state}
             hidden_spikes, sample_readout_spikes = network.run(inpts=sample_inpts, time=runtime)
             q_value = torch.sum(sample_readout_spikes[action_pop_size * action: action_pop_size * action + action_pop_size])
@@ -236,7 +237,7 @@ for i_episode in range(num_episodes):
             if sample_done:
                 loss = sample_reward - q_value
             else:
-                encoded_next_state = bernoulli(sample_next_state, runtime)
+                encoded_next_state = bernoulli(torch.sum(sample_next_state, dim=2), runtime)
                 next_inpts = {'X': encoded_next_state}
                 _, target_readout_spikes = target_network.run(inpts=sample_inpts, time=runtime)
                 target_q_values = torch.Tensor([target_readout_spikes[(i * action_pop_size):(i * action_pop_size) + action_pop_size].sum()
@@ -247,10 +248,11 @@ for i_episode in range(num_episodes):
             if plot:
                 spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes},ims=spike_ims, axes=spike_axes)
                 plt.pause(1e-8)
-            exc_readout_conn.update(loss=loss, input_spikes=hidden_spikes, action=sample_action)
+
+            exc_readout_conn.update(loss=loss, input_spikes=hidden_spikes, readout_spikes=sample_readout_spikes, action=sample_action)
+            # exc_readout_conn.normalize()
 
         total_t += 1
-
         if done:
             print("\nEpisode Reward: {}".format(episode_rewards[i_episode]))
             break
