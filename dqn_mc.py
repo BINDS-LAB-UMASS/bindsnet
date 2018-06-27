@@ -147,9 +147,9 @@ for i_episode in range(num_episodes):
 
         target_values = torch.tensor(reward_batch) + q_values_next * discount_factor
 
-        target_action_values = state_action_values
+        target_action_values = state_action_values.clone()
 
-        target_action_values[0:batch_size, list(reward_batch)] = target_values
+        target_action_values[list(range(0,batch_size)), list(action_batch)] = target_values
 
         loss = F.mse_loss(state_action_values, target_action_values)
 
