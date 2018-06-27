@@ -41,6 +41,9 @@ total_actions = len(VALID_ACTIONS)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+if torch.cuda.is_available():
+    torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
 network = Net().to(device)
 target_net = Net().to(device)
 target_net.load_state_dict(network.state_dict())
@@ -112,9 +115,8 @@ for i_episode in range(num_episodes):
         for _ in range(4):
             epsilon = epsilons[min(total_t, epsilon_decay_steps - 1)]
             encoded_state = torch.sum(state, dim=2)
-            q_values = network(encoded_state.view([1, -1]))[0]
+            q_values = network(encoded_state.view([1, -1]).cuda())[0]
             action_probs = policy(q_values, epsilon)
-            print(action_probs)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
             next_state = torch.clamp(next_obs - obs, min=0)
@@ -133,19 +135,23 @@ for i_episode in range(num_episodes):
 
         states_batch, action_batch, reward_batch, next_states_batch, done_batch = zip(*samples)
         states_batch = [torch.sum(state, dim=2).view(1, -1) for state in states_batch]
-        state_action_values = network(torch.cat(states_batch))
-        print(torch.tensor([float(a) for a in action_batch]))
-        gather_indices = torch.arange(batch_size) * state_action_values.shape[1] + torch.tensor(action_batch)
-        state_action_values = torch.gather(state_action_values.view(-1), gather_indices)
-        print(state_action_values.shape)
+        next_states_batch = [torch.sum(state, dim=2).view(1, -1) for state in next_states_batch]
+        state_action_values = network(torch.cat(states_batch).cuda())
+        gather_indices = torch.arange(batch_size) * state_action_values.shape[1] + torch.tensor([float(a) for a in action_batch])
 
-        q_values_next = target_net(next_states_batch).max(1)[0]
+        action_values = torch.gather(state_action_values.view(-1), 0, gather_indices.long())
 
-        q_values_next[done_batch] = 0
+        q_values_next = target_net(torch.cat(next_states_batch).cuda()).max(1)[0]
 
-        target_values = reward_batch + q_values_next * discount_factor
+        q_values_next[list(done_batch)] = 0
 
-        loss = F.MSELoss(state_action_values, target_values.unsqueeze(1))
+        target_values = torch.tensor(reward_batch) + q_values_next * discount_factor
+
+        target_action_values = state_action_values
+
+        target_action_values[0:batch_size, list(reward_batch)] = target_values
+
+        loss = F.mse_loss(state_action_values, target_action_values)
 
         optimizer.zero_grad()
         loss.backward()
