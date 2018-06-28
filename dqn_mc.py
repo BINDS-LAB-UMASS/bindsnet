@@ -28,7 +28,7 @@ replay_memory_init_size = 50000
 epsilon_start = 1.0
 epsilon_end = 0.1
 epsilon_decay_steps = 200000
-num_episodes = 10000
+num_episodes = 30000
 update_target_estimator_every = 10000
 batch_size = 32
 discount_factor = 0.99
@@ -161,3 +161,5 @@ for i_episode in range(num_episodes):
         if done:
             print("\nEpisode Reward: {}".format(episode_rewards[i_episode]))
             break
+
+torch.save(network, 'dqn.pt')
