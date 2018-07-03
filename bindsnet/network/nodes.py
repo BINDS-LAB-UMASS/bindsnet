@@ -1,5 +1,4 @@
 import torch
-
 from operator  import mul
 from functools import reduce
 from abc       import ABC, abstractmethod
@@ -252,8 +251,9 @@ class LIFNodes(Nodes):
         self.v += (self.refrac_count == 0).float() * inpts
 
         # Check for spiking neurons.
-        self.s = (self.v >= self.thresh)
-
+        spikeprobs = torch.distributions.Bernoulli(torch.clamp(self.v - self.rest, min=0, max=self.thresh - self.rest) / (self.thresh - self.rest))
+        self.s = spikeprobs.sample()
+        self.s = self.s.byte()
         # Refractoriness and voltage reset.
         self.refrac_count.masked_fill_(self.s, self.refrac)
         self.v.masked_fill_(self.s, self.reset)
@@ -325,7 +325,8 @@ class CurrentLIFNodes(Nodes):
         self.v += (self.refrac_count == 0).float() * self.i
 
         # Check for spiking neurons.
-        self.s = (self.v >= self.thresh) & (self.refrac_count == 0)
+        spikeprobs = torch.distributions.Bernoulli(torch.clamp(self.v - self.rest, min=0, max=self.thresh - self.rest) / (self.thresh - self.rest))
+        self.s = spikeprobs.sample().byte()
 
         # Refractoriness and voltage reset.
         self.refrac_count.masked_fill_(self.s, self.refrac)
@@ -400,6 +401,7 @@ class AdaptiveLIFNodes(Nodes):
 
         # Integrate inputs.
         self.v += (self.refrac_count == 0).float() * inpts
+        # self.v = torch.clamp(self.v, min=self.rest)
 
         # Check for spiking neurons.
         self.s = (self.v >= self.thresh + self.theta)
