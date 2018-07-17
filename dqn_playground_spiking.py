@@ -66,10 +66,10 @@ layers = {'X': inpt, 'E': exc, 'R': readout}
 
 # Connections between layers.
 # Input -> excitatory.
-input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10, update_rule=post_pre, nu=0.00025)
+input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10, update_rule=post_pre, nu=0.0005)
 
 # Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 100, update_rule=post_pre, nu=0.00025)
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 100, update_rule=post_pre, nu=0.0005)
 
 # Add all layers and connections to the network.
 for layer in layers:
