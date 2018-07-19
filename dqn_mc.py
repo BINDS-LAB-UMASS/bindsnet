@@ -9,6 +9,10 @@ from bindsnet import *
 from collections import deque, namedtuple
 import itertools
 
+isConvNet = True
+network_file = 'dqn_conv.pt'
+
+
 class Net(nn.Module):
 
     def __init__(self):
@@ -22,6 +26,20 @@ class Net(nn.Module):
         x = self.fc2(x)
         return x
 
+
+class ConvNet(nn.Module):
+
+    def __init__(self):
+        super(ConvNet, self).__init__()
+        self.conv1 = nn.Conv2d(4, 32, 8, stride=4)
+        self.fc1 = nn.Linear(11552, 1000)
+        self.fc2 = nn.Linear(1000, 4)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.fc1(x.view(x.size(0), -1)))
+        x = self.fc2(x)
+        return x
 
 replay_memory_size = 200000
 replay_memory_init_size = 50000
@@ -44,8 +62,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
-network = Net().to(device)
-target_net = Net().to(device)
+if isConvNet:
+    network = ConvNet().to(device)
+    target_net = ConvNet().to(device)
+else:
+    network = Net().to(device)
+    target_net = Net().to(device)
 target_net.load_state_dict(network.state_dict())
 optimizer = optim.RMSprop(network.parameters(), lr=0.00025, momentum=0.95, eps=0.01)
 
@@ -104,6 +126,7 @@ for i_episode in range(num_episodes):
     for t in itertools.count():
         # Maybe update the target estimator
         if total_t % update_target_estimator_every == 0:
+            torch.save(network, network_file)
             target_net.load_state_dict(network.state_dict())
             print("\nCopied model parameters to target network.")
 
@@ -111,11 +134,13 @@ for i_episode in range(num_episodes):
             t, total_t, i_episode + 1, num_episodes, loss), end="")
         sys.stdout.flush()
 
-
         for _ in range(4):
             epsilon = epsilons[min(total_t, epsilon_decay_steps - 1)]
-            encoded_state = torch.sum(state, dim=2)
-            q_values = network(encoded_state.view([1, -1]).cuda())[0]
+            if isConvNet:
+                encoded_state = state.permute(2, 0, 1).unsqueeze(0)
+            else:
+                encoded_state = torch.sum(state, dim=2).view([1, -1])
+            q_values = network(encoded_state.cuda())[0]
             action_probs = policy(q_values, epsilon)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
@@ -134,8 +159,14 @@ for i_episode in range(num_episodes):
         samples = random.sample(replay_memory, batch_size)
 
         states_batch, action_batch, reward_batch, next_states_batch, done_batch = zip(*samples)
-        states_batch = [torch.sum(state, dim=2).view(1, -1) for state in states_batch]
-        next_states_batch = [torch.sum(state, dim=2).view(1, -1) for state in next_states_batch]
+
+        if isConvNet:
+            states_batch = [state.permute(2, 0, 1).unsqueeze(0) for state in states_batch]
+            next_states_batch = [state.permute(2, 0, 1).unsqueeze(0) for state in next_states_batch]
+        else:
+            states_batch = [torch.sum(state, dim=2).view(1, -1) for state in states_batch]
+            next_states_batch = [torch.sum(state, dim=2).view(1, -1) for state in next_states_batch]
+
         state_action_values = network(torch.cat(states_batch).cuda())
         gather_indices = torch.arange(batch_size) * state_action_values.shape[1] + torch.tensor([float(a) for a in action_batch])
 
@@ -162,4 +193,4 @@ for i_episode in range(num_episodes):
             print("\nEpisode Reward: {}".format(episode_rewards[i_episode]))
             break
 
-torch.save(network, 'dqn.pt')
+torch.save(network, network_file)
