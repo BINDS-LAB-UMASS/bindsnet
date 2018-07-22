@@ -6,6 +6,7 @@ import numpy as np
 import random
 from gym import wrappers
 from bindsnet import *
+from time import time
 from collections import deque, namedtuple
 import itertools
 import argparse
@@ -22,10 +23,11 @@ parser.add_argument('--gpu', dest='gpu', action='store_true')
 parser.set_defaults(plot=False, render=False, gpu=False)
 locals().update(vars(parser.parse_args()))
 
-num_episodes = 100
+num_episodes = 10000
 action_pop_size = 1
 hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
+epsilon = 0.01  #probability of picking random action
 
 class Net(nn.Module):
 
@@ -66,10 +68,10 @@ layers = {'X': inpt, 'E': exc, 'R': readout}
 
 # Connections between layers.
 # Input -> excitatory.
-input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10, update_rule=post_pre, nu=0.0005)
+input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10, update_rule=post_pre, nu=0.00025)
 
 # Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 100, update_rule=post_pre, nu=0.0005)
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 100, update_rule=post_pre, nu=0.00025)
 
 # Add all layers and connections to the network.
 for layer in layers:
@@ -104,7 +106,7 @@ def policy(rspikes, eps):
                                for i in range(total_actions)])
     A = np.ones(4, dtype=float) * eps / 4
     if torch.max(q_values) == 0:
-        return [0.25,0.25,0.25,0.25]
+        return [0.25, 0.25, 0.25, 0.25]
     best_action = torch.argmax(q_values)
     A[best_action] += (1.0 - eps)
     return A
@@ -118,11 +120,13 @@ state = obs
 
 if plot:
     voltages = {'E': exc_voltages, 'R': readout_voltages}
-    inpt = bernoulli(state, runtime).view(runtime, 6400).sum(0).view(80,80)
+    inpt = bernoulli(state, runtime).view(runtime, 6400).sum(0).view(80, 80)
     spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes})
     inpt_axes, inpt_ims = plot_input(state, inpt)
     voltage_ims, voltage_axes = plot_voltages(voltages)
     plt.pause(1e-8)
+
+startTime = time()
 
 for i_episode in range(num_episodes):
     obs = environment.reset()
@@ -132,7 +136,6 @@ for i_episode in range(num_episodes):
         print("\rStep {} ({}) @ Episode {}/{}".format(
             t, total_t, i_episode + 1, num_episodes), end="")
         sys.stdout.flush()
-        epsilon = 0.01
         encoded_state = bernoulli(torch.sum(state, dim=2), runtime)
         inpts = {'X': encoded_state}
         hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
@@ -164,5 +167,13 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-np.savetxt('rewards_snn.txt', episode_rewards)
-np.savetxt('steps_snn.txt', episode_lengths)
+    np.savetxt('rewards_snn_stdp_10000.txt', episode_rewards)
+    np.savetxt('steps_snn_stdp_10000.txt', episode_lengths)
+
+endTime = time()
+
+print("\nTotal time taken:", endTime - startTime)
+np.savetxt('rewards_snn_stdp_10000.txt', episode_rewards)
+np.savetxt('steps_snn_stdp_10000.txt', episode_lengths)
+
+
