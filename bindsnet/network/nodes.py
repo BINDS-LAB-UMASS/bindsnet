@@ -205,7 +205,7 @@ class LIFNodes(Nodes):
     Layer of leaky integrate-and-fire (LIF) neurons.
     '''
     def __init__(self, n=None, shape=None, traces=False, thresh=-52.0, rest=-65.0,
-                 reset=-65.0, refrac=5, decay=1e-2, trace_tc=5e-2):
+                 reset=-65.0, refrac=5, decay=1e-2, trace_tc=5e-2, probabilistic=False):
         '''
         Instantiates a layer of LIF neurons.
 
@@ -228,6 +228,7 @@ class LIFNodes(Nodes):
         self.thresh = thresh   # Spike threshold voltage.
         self.refrac = refrac   # Post-spike refractory period.
         self.decay = decay     # Rate of decay of neuron voltage.
+        self.probabilistic = probabilistic
 
         self.v = self.rest * torch.ones(self.shape)  # Neuron voltages.
         self.refrac_count = torch.zeros(self.shape)  # Refractory period counters.
@@ -251,9 +252,13 @@ class LIFNodes(Nodes):
         self.v += (self.refrac_count == 0).float() * inpts
 
         # Check for spiking neurons.
-        spikeprobs = torch.distributions.Bernoulli(torch.clamp(self.v - self.rest, min=0, max=self.thresh - self.rest) / (self.thresh - self.rest))
-        self.s = spikeprobs.sample()
-        self.s = self.s.byte()
+        if self.probabilistic:
+            spikeprobs = torch.distributions.Bernoulli(torch.clamp(self.v - self.rest, min=0, max=self.thresh - self.rest) / (self.thresh - self.rest))
+            self.s = spikeprobs.sample()
+            self.s = self.s.byte()
+        else:
+            self.s = (self.v >= self.thresh)
+
         # Refractoriness and voltage reset.
         self.refrac_count.masked_fill_(self.s, self.refrac)
         self.v.masked_fill_(self.s, self.reset)
