@@ -239,7 +239,7 @@ class Network:
 
         # Simulate network activity for `time` timesteps.
         hidden_spikes = torch.zeros_like(self.layers['E'].s)
-        readout_spikes = torch.zeros_like(self.layers['R'].s)
+        readout_spikes = torch.zeros(timesteps, self.layers['R'].s.shape[0])
         self._reset()
         for t in range(timesteps):
             # Update each layer of nodes.
@@ -254,12 +254,12 @@ class Network:
                 clamp = clamps.get(c[1], None)
                 if clamp is not None:
                     self.layers[c[1]].s[clamp] = 1
-                # self.connections[c].update(reward=reward)
+                self.connections[c].update(reward=reward)
 
                 if c[0] is 'X':
                     hidden_spikes += self.layers[c[1]].s
                 elif c[1] is 'R':
-                    readout_spikes += self.layers[c[1]].s
+                    readout_spikes[t] = self.layers[c[1]].s
                 # elif c[1] == 'Ae':
                 #     self.layers[c[1]].s = temp
 
@@ -285,7 +285,6 @@ class Network:
         # Re-normalize connections.
         # for c in self.connections:
         #     self.connections[c].normalize()
-
         return hidden_spikes, readout_spikes
 
     def _reset(self):

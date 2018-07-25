@@ -23,7 +23,7 @@ parser.add_argument('--gpu', dest='gpu', action='store_true')
 parser.set_defaults(plot=False, render=False, gpu=False)
 locals().update(vars(parser.parse_args()))
 
-num_episodes = 100
+num_episodes = 10000
 action_pop_size = 1
 hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
@@ -47,7 +47,7 @@ class Net(nn.Module):
 VALID_ACTIONS = [0, 1, 2, 3]
 total_actions = len(VALID_ACTIONS)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if torch.cuda.is_available():
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
@@ -143,7 +143,7 @@ for i_episode in range(num_episodes):
         encoded_state = bernoulli(torch.sum(state, dim=2), runtime)
         inpts = {'X': encoded_state}
         hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
-        action_probs = policy(readout_spikes, epsilon)
+        action_probs = policy(torch.sum(readout_spikes, dim=0), epsilon)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
         next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
         next_state = torch.clamp(next_obs - obs, min=0)
@@ -171,13 +171,13 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-    np.savetxt('rewards_snn_stdp_0.txt', episode_rewards)
-    np.savetxt('steps_snn_stdp_0.txt', episode_lengths)
+    np.savetxt('rewards_snn_stdp_10000.txt', episode_rewards)
+    np.savetxt('steps_snn_stdp_10000.txt', episode_lengths)
 
 endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
-np.savetxt('rewards_snn_stdp_0.txt', episode_rewards)
-np.savetxt('steps_snn_stdp_0.txt', episode_lengths)
+np.savetxt('rewards_snn_stdp_10000.txt', episode_rewards)
+np.savetxt('steps_snn_stdp_10000.txt', episode_lengths)
 
 
