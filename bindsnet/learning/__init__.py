@@ -22,7 +22,7 @@ def post_pre(conn, **kwargs):
         conn.w -= conn.nu_pre * s_source * x_target
 
         # Bound weights.
-        conn.w = torch.clamp(conn.w, conn.wmin, conn.wmax)
+        # conn.w = torch.clamp(conn.w, conn.wmin, conn.wmax)
     else:
         out_channels, _, kernel_height, kernel_width = conn.w.size()
         padding, stride = conn.padding, conn.stride
