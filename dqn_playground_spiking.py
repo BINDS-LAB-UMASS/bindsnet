@@ -23,7 +23,7 @@ parser.add_argument('--gpu', dest='gpu', action='store_true')
 parser.set_defaults(plot=False, render=False, gpu=False)
 locals().update(vars(parser.parse_args()))
 
-num_episodes = 10000
+num_episodes = 100
 action_pop_size = 1
 hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
@@ -62,16 +62,16 @@ dqn_network = torch.load('dqn.pt')
 
 # Layers of neurons.
 inpt = Input(n=6400, shape=[80, 80], traces=True)  # Input layer
-exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus= 0.05, theta_decay=1e-7)  # Excitatory layer
-readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=False)  # Readout layer
+exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus= 0.05, theta_decay=1e-7, probabilistic=True)  # Excitatory layer
+readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=True)  # Readout layer
 layers = {'X': inpt, 'E': exc, 'R': readout}
 
 # Connections between layers.
 # Input -> excitatory.
-input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10, update_rule=post_pre, nu=0.00025)
+input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10)
 
 # Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 100, update_rule=post_pre, nu=0.00025)
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 100)
 
 # Add all layers and connections to the network.
 for layer in layers:
@@ -171,13 +171,13 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-    np.savetxt('rewards_snn_stdp_10000.txt', episode_rewards)
-    np.savetxt('steps_snn_stdp_10000.txt', episode_lengths)
+    np.savetxt('analysis/rewards_snn_probablistic_0.txt', episode_rewards)
+    np.savetxt('analysis/steps_snn_probablistic_0.txt', episode_lengths)
 
 endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
-np.savetxt('rewards_snn_stdp_10000.txt', episode_rewards)
-np.savetxt('steps_snn_stdp_10000.txt', episode_lengths)
+np.savetxt('analysis/rewards_snn_probablistic_0.txt', episode_rewards)
+np.savetxt('analysis/steps_snn_probablistic_0.txt', episode_lengths)
 
 

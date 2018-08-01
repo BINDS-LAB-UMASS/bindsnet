@@ -355,7 +355,7 @@ class AdaptiveLIFNodes(Nodes):
     Layer of leaky integrate-and-fire (LIF) neurons with adaptive thresholds.
     '''
     def __init__(self, n=None, shape=None, traces=False, rest=-65.0, reset=-65.0, thresh=-52.0,
-                 refrac=5, decay=1e-2, trace_tc=5e-2, theta_plus=0.05, theta_decay=1e-7):
+                 refrac=5, decay=1e-2, trace_tc=5e-2, theta_plus=0.05, theta_decay=1e-7, probabilistic=False):
         '''
         Instantiates a layer of LIF neurons with adaptive firing thresholds.
 
@@ -382,6 +382,7 @@ class AdaptiveLIFNodes(Nodes):
         self.decay = decay              # Rate of decay of neuron voltage.
         self.theta_plus = theta_plus    # Constant threshold increase on spike.
         self.theta_decay = theta_decay  # Rate of decay of adaptive thresholds.
+        self.probabilistic = probabilistic
 
         self.v = self.rest * torch.ones(self.shape)  # Neuron voltages.
         self.theta = torch.zeros(self.shape)         # Adaptive thresholds.
@@ -409,7 +410,12 @@ class AdaptiveLIFNodes(Nodes):
         # self.v = torch.clamp(self.v, min=self.rest)
 
         # Check for spiking neurons.
-        self.s = (self.v >= self.thresh + self.theta)
+        if self.probabilistic:
+            spikeprobs = torch.distributions.Bernoulli(torch.clamp(self.v - self.rest, min=0, max=self.thresh - self.rest) / (self.thresh - self.rest))
+            self.s = spikeprobs.sample()
+            self.s = self.s.byte()
+        else:
+            self.s = (self.v >= self.thresh + self.theta)
 
         # Refractoriness, voltage reset, and adaptive thresholds.
         self.refrac_count.masked_fill_(self.s, self.refrac)
