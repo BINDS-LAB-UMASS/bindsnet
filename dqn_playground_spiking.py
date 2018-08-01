@@ -28,6 +28,7 @@ action_pop_size = 1
 hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
 epsilon = 0.0  #probability of picking random action
+accumulator = True
 
 class Net(nn.Module):
 
@@ -57,13 +58,13 @@ else:
     dtype = torch.FloatTensor
 
 # Build network.
-network = Network(dt=dt)
+network = Network(dt=dt, accumulator=accumulator)
 dqn_network = torch.load('dqn.pt')
 
 # Layers of neurons.
 inpt = Input(n=6400, shape=[80, 80], traces=True)  # Input layer
-exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus= 0.05, theta_decay=1e-7, probabilistic=True)  # Excitatory layer
-readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=True)  # Readout layer
+exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus= 0.05, theta_decay=1e-7, probabilistic=False)  # Excitatory layer
+readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=False)  # Readout layer
 layers = {'X': inpt, 'E': exc, 'R': readout}
 
 # Connections between layers.
@@ -171,13 +172,13 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-    np.savetxt('analysis/rewards_snn_probablistic_0.txt', episode_rewards)
-    np.savetxt('analysis/steps_snn_probablistic_0.txt', episode_lengths)
+    np.savetxt('analysis/rewards_snn_accumulator_0.txt', episode_rewards)
+    np.savetxt('analysis/steps_snn_accumulator_0.txt', episode_lengths)
 
 endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
-np.savetxt('analysis/rewards_snn_probablistic_0.txt', episode_rewards)
-np.savetxt('analysis/steps_snn_probablistic_0.txt', episode_lengths)
+np.savetxt('analysis/rewards_snn_accumulator_0.txt', episode_rewards)
+np.savetxt('analysis/steps_snn_accumulator_0.txt', episode_lengths)
 
 

@@ -75,7 +75,7 @@ class Network:
 
         plt.tight_layout(); plt.show()
     '''
-    def __init__(self, dt=1.0):
+    def __init__(self, dt=1.0, accumulator=False):
         '''
         Initializes network object.
 
@@ -88,6 +88,7 @@ class Network:
         self.layers = {}
         self.connections = {}
         self.monitors = {}
+        self.accumulator = accumulator
 
     def add_layer(self, layer, name):
         '''
@@ -281,6 +282,12 @@ class Network:
             # Record state variables of interest.
             for m in self.monitors:
                 self.monitors[m].record()
+
+            if self.accumulator:
+                qVals = torch.sum(readout_spikes, dim=0)
+                maxVals = (qVals == torch.max(qVals)).nonzero()
+                if len(maxVals) == 1:
+                    break
 
         # Re-normalize connections.
         # for c in self.connections:
