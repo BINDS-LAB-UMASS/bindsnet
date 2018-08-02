@@ -206,7 +206,6 @@ class GymEnvironment:
             self.obs = binary_image(self.obs)
         elif self.name == 'BreakoutDeterministic-v4':
             self.obs = subsample(gray_scale(crop(self.obs, 34, 194, 0, 160)), 80, 80)
-            self.obs = binary_image(self.obs)
         else: # Default pre-processing step
             self.obs = subsample(gray_scale(self.obs), 84, 110)
             self.obs = binary_image(self.obs)
