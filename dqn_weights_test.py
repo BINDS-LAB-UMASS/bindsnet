@@ -59,31 +59,42 @@ else:
     dtype = torch.FloatTensor
 
 # Build network.
-network = Network(dt=dt, accumulator=accumulator)
+network = load_network('model10.p')
 dqn_network = torch.load('dqn.pt')
 
-# Layers of neurons.
-inpt = Input(n=6400, shape=[80, 80], traces=True)  # Input layer
-exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus= 0.05, theta_decay=1e-7, probabilistic=False)  # Excitatory layer
-readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=False)  # Readout layer
-layers = {'X': inpt, 'E': exc, 'R': readout}
-
-# Connections between layers.
-# Input -> excitatory.
-input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10, update_rule=post_pre, nu=0.0000025)
-
-# Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 100, update_rule=post_pre, nu=0.000025)
-
-# Add all layers and connections to the network.
-for layer in layers:
-    network.add_layer(layers[layer], name=layer)
+# # Layers of neurons.
+# inpt = Input(n=6400, shape=[80, 80], traces=True)  # Input layer
+# exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus= 0.05, theta_decay=1e-7, probabilistic=False)  # Excitatory layer
+# readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=False)  # Readout layer
+# layers = {'X': inpt, 'E': exc, 'R': readout}
+#
+# # Connections between layers.
+# # Input -> excitatory.
+# input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10, update_rule=post_pre, nu=0.0000025)
+#
+# # Excitatory -> readout.
+# exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 100, update_rule=post_pre, nu=0.000025)
+#
+# # Add all layers and connections to the network.
+# for layer in layers:
+#     network.add_layer(layers[layer], name=layer)
 
 
 print(torch.mean(dqn_network.fc1.weight))
 print(torch.mean(dqn_network.fc2.weight))
 print(torch.median(dqn_network.fc1.weight))
 print(torch.median(dqn_network.fc2.weight))
-
 print(torch.std(dqn_network.fc1.weight))
 print(torch.std(dqn_network.fc2.weight))
+
+print('-----------')
+
+
+print(torch.mean(network.connections[('X', 'E')].w))
+print(torch.mean(network.connections[('E', 'R')].w))
+print(torch.median(network.connections[('X', 'E')].w))
+print(torch.median(network.connections[('E', 'R')].w))
+print(torch.std(network.connections[('X', 'E')].w))
+print(torch.std(network.connections[('E', 'R')].w))
+
+
