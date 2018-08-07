@@ -9,7 +9,7 @@ from bindsnet import *
 from collections import deque, namedtuple
 import itertools
 
-isConvNet = True
+isConvNet = False
 network_file = 'dqn_grayscale_4_stack.pt'
 
 
@@ -85,15 +85,15 @@ epsilons = np.linspace(epsilon_start, epsilon_end, epsilon_decay_steps)
 print("Populating replay memory...")
 
 obs = environment.reset()
-state = torch.stack([obs] * 4, dim=2)
+state = torch.cat([obs] * 4, dim=0)
 for i in range(replay_memory_init_size):
     action = np.random.choice(np.arange(total_actions))
     next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
-    next_state = torch.cat((state[:, :, 1:], next_obs.view([next_obs.shape[0], next_obs.shape[1], 1])), dim=2)
+    next_state = torch.cat((state[80:, :], next_obs), dim=0)
     replay_memory.append(Transition(state, action, reward, next_state, done))
     if done:
         obs = environment.reset()
-        state = torch.stack([obs] * 4, dim=2)
+        state = torch.cat([obs] * 4, dim=0)
     else:
         state = next_state
 
@@ -118,7 +118,7 @@ state = obs
 
 for i_episode in range(num_episodes):
     obs = environment.reset()
-    state = torch.stack([obs] * 4, dim=2)
+    state = torch.cat([obs] * 4, dim=0)
     loss = None
     # One step in the environment
     for t in itertools.count():
@@ -137,12 +137,12 @@ for i_episode in range(num_episodes):
             if isConvNet:
                 encoded_state = state.permute(2, 0, 1).unsqueeze(0)
             else:
-                encoded_state = state
+                encoded_state = state.view(-1)
             q_values = network(encoded_state.cuda())[0]
             action_probs = policy(q_values, epsilon)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
-            next_state = torch.cat((state[:, :, 1:], next_obs.view([next_obs.shape[0], next_obs.shape[1], 1])), dim=2)
+            next_state = torch.cat((state[80:, :], next_obs), dim=0)
             replay_memory.append(Transition(state, action, reward, next_state, done))
             episode_rewards[i_episode] += reward
 
@@ -159,13 +159,16 @@ for i_episode in range(num_episodes):
         if isConvNet:
             states_batch = [state.permute(2, 0, 1).unsqueeze(0) for state in states_batch]
             next_states_batch = [state.permute(2, 0, 1).unsqueeze(0) for state in next_states_batch]
+        else:
+            states_batch = [state.view(-1) for state in states_batch]
+            next_states_batch = [state.view(-1) for state in next_states_batch]
 
-        state_action_values = network(torch.cat(states_batch).cuda())
+        state_action_values = network(torch.stack(states_batch).cuda())
         gather_indices = torch.arange(batch_size) * state_action_values.shape[1] + torch.tensor([float(a) for a in action_batch])
 
         action_values = torch.gather(state_action_values.view(-1), 0, gather_indices.long())
 
-        q_values_next = target_net(torch.cat(next_states_batch).cuda()).max(1)[0]
+        q_values_next = target_net(torch.stack(next_states_batch).cuda()).max(1)[0]
 
         q_values_next[list(done_batch)] = 0
 
