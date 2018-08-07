@@ -23,7 +23,7 @@ parser.add_argument('--gpu', dest='gpu', action='store_true')
 parser.set_defaults(plot=False, render=False, gpu=False)
 locals().update(vars(parser.parse_args()))
 
-num_episodes = 500
+num_episodes = 100
 action_pop_size = 1
 hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
@@ -69,10 +69,10 @@ layers = {'X': inpt, 'E': exc, 'R': readout}
 
 # Connections between layers.
 # Input -> excitatory.
-input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10, update_rule=post_pre, nu=0.0000025)
+input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10, update_rule=post_pre, nu=0.0000000025)
 
 # Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 100, update_rule=post_pre, nu=0.000025)
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 10, update_rule=post_pre, nu=0.0000000025)
 
 # Add all layers and connections to the network.
 for layer in layers:
@@ -174,8 +174,8 @@ for i_episode in range(num_episodes):
 
     np.savetxt('analysis/rewards_snn_stdp.txt', episode_rewards)
     np.savetxt('analysis/steps_snn_stdp.txt', episode_lengths)
-    if i_episode % 10 == 0:
-        network.save('models/model'+str(i_episode)+'.p')
+    if (i_episode+1) % 10 == 0:
+        network.save('models/model'+str(i_episode+1)+'.p')
 
 endTime = time()
 
