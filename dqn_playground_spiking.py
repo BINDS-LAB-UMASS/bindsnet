@@ -29,7 +29,9 @@ hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
 epsilon = 0.0  #probability of picking random action
 accumulator = False
-probabilistic = True
+probabilistic = False
+noop_counter = 0
+
 
 class Net(nn.Module):
 
@@ -60,7 +62,7 @@ else:
 
 # Build network.
 network = Network(dt=dt, accumulator=accumulator)
-dqn_network = torch.load('dqn.pt')
+dqn_network = torch.load('dqn_time_difference_grayscale.pt')
 
 # Layers of neurons.
 inpt = Input(n=6400, shape=[80, 80], traces=True)  # Input layer
@@ -73,7 +75,7 @@ layers = {'X': inpt, 'E': exc, 'R': readout}
 input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10)
 
 # Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 100)
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 10)
 
 # Add all layers and connections to the network.
 for layer in layers:
@@ -142,11 +144,19 @@ for i_episode in range(num_episodes):
         print("\rStep {} ({}) @ Episode {}/{}".format(
             t, total_t, i_episode + 1, num_episodes), end="")
         sys.stdout.flush()
-        encoded_state = bernoulli(torch.sum(state, dim=2), runtime)
+        encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
+        encoded_state = bernoulli(torch.sum(encoded_state, dim=2), runtime)
         inpts = {'X': encoded_state}
         hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
         action_probs = policy(torch.sum(readout_spikes, dim=0), epsilon)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+        if action == 0:
+            noop_counter += 1
+        else:
+            noop_counter = 0
+        if noop_counter >= 20:
+            action = np.random.choice(np.arange(len(action_probs)))
+            noop_counter = 0
         next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
         next_state = torch.clamp(next_obs - obs, min=0)
         next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
@@ -173,13 +183,13 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-    np.savetxt('analysis/rewards_snn_exp_probabilistic.txt', episode_rewards)
-    np.savetxt('analysis/steps_snn_exp_probabilistic.txt', episode_lengths)
+    np.savetxt('analysis/rewards_snn_tdg.txt', episode_rewards)
+    np.savetxt('analysis/steps_snn_tdg.txt', episode_lengths)
 
 endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
-np.savetxt('analysis/rewards_snn_exp_probabilistic.txt', episode_rewards)
-np.savetxt('analysis/steps_snn_exp_probabilistic.txt', episode_lengths)
+np.savetxt('analysis/rewards_snn_tdg.txt', episode_rewards)
+np.savetxt('analysis/steps_snn_tdg.txt', episode_lengths)
 
 

@@ -253,7 +253,7 @@ class LIFNodes(Nodes):
 
         # Check for spiking neurons.
         if self.probabilistic:
-            spikeprobs = torch.distributions.Bernoulli(torch.clamp(torch.exp(self.v - self.thresh), min=0, max=1))
+            spikeprobs = torch.distributions.Bernoulli(torch.clamp((self.v - self.rest)/(self.thresh-self.rest), min=0, max=1))
             self.s = spikeprobs.sample()
             self.s = self.s.byte()
         else:
@@ -411,7 +411,8 @@ class AdaptiveLIFNodes(Nodes):
 
         # Check for spiking neurons.
         if self.probabilistic:
-            spikeprobs = torch.distributions.Bernoulli(torch.clamp(torch.exp(self.v - self.thresh), min=0, max=1))
+            spikeprobs = torch.distributions.Bernoulli(
+                torch.clamp((self.v - self.rest) / (self.thresh + self.theta - self.rest), min=0, max=1))
             self.s = spikeprobs.sample()
             self.s = self.s.byte()
         else:

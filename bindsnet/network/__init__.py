@@ -255,10 +255,10 @@ class Network:
                 clamp = clamps.get(c[1], None)
                 if clamp is not None:
                     self.layers[c[1]].s[clamp] = 1
-                if c[1] is 'R':
-                    self.layers[c[1]].s[0] = 0
-                    self.layers[c[1]].s[1] = 0
-                    self.layers[c[1]].s[3] = 0
+                # if c[1] is 'R':
+                #     self.layers[c[1]].s[0] = 0
+                #     self.layers[c[1]].s[1] = 0
+                #     self.layers[c[1]].s[3] = 0
 
                 self.connections[c].update(reward=reward)
 
