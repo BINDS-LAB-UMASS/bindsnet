@@ -72,10 +72,10 @@ layers = {'X': inpt, 'E': exc, 'R': readout}
 
 # Connections between layers.
 # Input -> excitatory.
-input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 10)
+input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 20)
 
 # Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 10)
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 20)
 
 # Add all layers and connections to the network.
 for layer in layers:
@@ -183,13 +183,13 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-    np.savetxt('analysis/rewards_snn_tdg.txt', episode_rewards)
-    np.savetxt('analysis/steps_snn_tdg.txt', episode_lengths)
+    np.savetxt('analysis/rewards_snn_tdg_20x.txt', episode_rewards)
+    np.savetxt('analysis/steps_snn_tdg_20x.txt', episode_lengths)
 
 endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
-np.savetxt('analysis/rewards_snn_tdg.txt', episode_rewards)
-np.savetxt('analysis/steps_snn_tdg.txt', episode_lengths)
+np.savetxt('analysis/rewards_snn_tdg_20x.txt', episode_rewards)
+np.savetxt('analysis/steps_snn_tdg_20x.txt', episode_lengths)
 
 
