@@ -29,7 +29,7 @@ hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
 epsilon = 0.0  #probability of picking random action
 accumulator = False
-probabilistic = False
+probabilistic = True
 noop_counter = 0
 
 
@@ -183,13 +183,13 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-    np.savetxt('analysis/rewards_snn_tdg_20x.txt', episode_rewards)
-    np.savetxt('analysis/steps_snn_tdg_20x.txt', episode_lengths)
+    np.savetxt('analysis/rewards_snn_prob_tdg_20x.txt', episode_rewards)
+    np.savetxt('analysis/steps_snn_prob_tdg_20x.txt', episode_lengths)
 
 endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
-np.savetxt('analysis/rewards_snn_tdg_20x.txt', episode_rewards)
-np.savetxt('analysis/steps_snn_tdg_20x.txt', episode_lengths)
+np.savetxt('analysis/rewards_snn_prob_tdg_20x.txt', episode_rewards)
+np.savetxt('analysis/steps_snn_prob_tdg_20x.txt', episode_lengths)
 
 
