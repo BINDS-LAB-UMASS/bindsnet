@@ -10,6 +10,7 @@ from time import time
 from collections import deque, namedtuple
 import itertools
 import argparse
+import pickle
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=0)
@@ -107,7 +108,7 @@ network.add_monitor(readout_voltage_monitor, name='readout_voltage')
 
 total_t = 0
 episode_rewards = np.zeros(num_episodes)
-episode_lengths = np.zeros(num_episodes)
+q_values = []
 
 def policy(rspikes, eps):
     q_values = torch.Tensor([rspikes[(i * action_pop_size):(i * action_pop_size) + action_pop_size].sum()
@@ -161,7 +162,7 @@ for i_episode in range(num_episodes):
         next_state = torch.clamp(next_obs - obs, min=0)
         next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
         episode_rewards[i_episode] += reward
-        episode_lengths[i_episode] = t
+        q_values.append(readout_spikes)
         total_t += 1
 
         if plot:
@@ -183,13 +184,14 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-    np.savetxt('analysis/rewards_snn_prob_tdg_20x.txt', episode_rewards)
-    np.savetxt('analysis/steps_snn_prob_tdg_20x.txt', episode_lengths)
+    # np.savetxt('analysis/rewards_snn_prob_tdg_10_100x.txt', episode_rewards)
+    # pickle.dump(q_values, open("analysis/q_vals_snn_prob_tdg_10_100x.txt", "wb"))
 
 endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
-np.savetxt('analysis/rewards_snn_prob_tdg_20x.txt', episode_rewards)
-np.savetxt('analysis/steps_snn_prob_tdg_20x.txt', episode_lengths)
+np.savetxt('analysis/rewards_snn_prob_tdg_10_100x.txt', episode_rewards)
+pickle.dump(q_values, open("analysis/q_vals_snn_prob_tdg_10_100x.txt", "wb"))
+
 
 
