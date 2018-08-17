@@ -10,7 +10,7 @@ from collections import deque, namedtuple
 import itertools
 import pickle
 
-isConvNet = True
+isConvNet = False
 network_file = 'dqn_data_collection.pt'
 
 
@@ -91,7 +91,7 @@ sample_number = 0
 
 def save_state(state):
     global sample_number
-    encoded_state = torch.sum(torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda(), dim=2).unsqueeze(0).unsqueeze(0)
+    encoded_state = torch.sum(torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda(), dim=2)
     pickle.dump(encoded_state, open('./data/frames/' + str(sample_number) + '.frame', 'wb'))
     sample_number += 1
 
@@ -105,6 +105,7 @@ for i in range(replay_memory_init_size):
     action = np.random.choice(np.arange(total_actions))
     next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
     next_state = torch.clamp(next_obs - obs, min=0)
+    next_state[77:, :] = next_obs[77:, :]
     next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
     replay_memory.append(Transition(state, action, reward, next_state, done))
     if done:
@@ -164,6 +165,7 @@ for i_episode in range(num_episodes):
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
             next_state = torch.clamp(next_obs - obs, min=0)
+            next_state[77:, :] = next_obs[77:, :]
             next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
             replay_memory.append(Transition(state, action, reward, next_state, done))
             episode_rewards[i_episode] += reward
