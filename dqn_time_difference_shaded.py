@@ -144,10 +144,10 @@ for i_episode in range(num_episodes):
                 encoded_state = torch.sum(encoded_state, dim=2).view([1, -1])
             q_values = network(encoded_state.cuda())[0]
             action_probs = policy(q_values, epsilon)
-            next_state[77:, :] = next_obs[77:, :]
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
             next_state = torch.clamp(next_obs - obs, min=0)
+            next_state[77:, :] = next_obs[77:, :]
             next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
             replay_memory.append(Transition(state, action, reward, next_state, done))
             episode_rewards[i_episode] += reward
