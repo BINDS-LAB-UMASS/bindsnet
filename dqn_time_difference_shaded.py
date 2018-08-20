@@ -10,7 +10,7 @@ from collections import deque, namedtuple
 import itertools
 
 isConvNet = False
-network_file = 'dqn_time_difference_grayscale.pt'
+network_file = 'dqn_time_difference_grayscale_only_last_paddle.pt'
 
 
 class Net(nn.Module):
@@ -141,7 +141,9 @@ for i_episode in range(num_episodes):
                 encoded_state = state.permute(2, 0, 1).unsqueeze(0)
             else:
                 encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
-                encoded_state = torch.sum(encoded_state, dim=2).view([1, -1])
+                encoded_state = torch.sum(encoded_state, dim=2)
+                encoded_state[77:, :] = state[77:, :, 3]
+                encoded_state = encoded_state.view([1, -1])
             q_values = network(encoded_state.cuda())[0]
             action_probs = policy(q_values, epsilon)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
@@ -168,7 +170,15 @@ for i_episode in range(num_episodes):
             next_states_batch = [state.permute(2, 0, 1).unsqueeze(0) for state in next_states_batch]
         else:
             states_batch = [torch.sum(torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda(), dim=2).view(1, -1) for state in states_batch]
-            next_states_batch = [torch.sum(torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda(), dim=2).view(1, -1) for state in next_states_batch]
+            temp_next_batch = []
+            for state in next_states_batch:
+                encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
+                encoded_state = torch.sum(encoded_state, dim=2)
+                encoded_state[77:, :] = state[77:, :, 3]
+                encoded_state = encoded_state.view([1, -1])
+                temp_next_batch.append(encoded_state)
+            next_states_batch = temp_next_batch
+            # next_states_batch = [torch.sum(torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda(), dim=2).view(1, -1) for state in next_states_batch]
 
         state_action_values = network(torch.cat(states_batch).cuda())
         gather_indices = torch.arange(batch_size) * state_action_values.shape[1] + torch.tensor([float(a) for a in action_batch])
