@@ -10,8 +10,6 @@ from collections import deque, namedtuple
 import itertools
 
 num_episodes = 100
-epsilon = 0.0
-noop_counter = 0
 
 class Net(nn.Module):
 
@@ -40,21 +38,10 @@ if torch.cuda.is_available():
 # Load SpaceInvaders environment.
 environment = GymEnvironment('BreakoutDeterministic-v4')
 
-network = torch.load('dqn_time_difference_grayscale.pt')
 total_t = 0
 episode_rewards = np.zeros(num_episodes)
 episode_lengths = np.zeros(num_episodes)
 
-experiment_dir = os.path.abspath("./ann/{}".format(environment.env.spec.id))
-monitor_path = os.path.join(experiment_dir, "monitor")
-environment.env = wrappers.Monitor(environment.env, directory=monitor_path, resume=True)
-
-
-def policy(q_values, eps):
-    A = np.ones(4, dtype=float) * eps / 4
-    best_action = torch.argmax(q_values)
-    A[best_action] += (1.0 - eps)
-    return A
 
 for i_episode in range(num_episodes):
     obs = environment.reset()
@@ -64,22 +51,11 @@ for i_episode in range(num_episodes):
         print("\rStep {} ({}) @ Episode {}/{}".format(
             t, total_t, i_episode + 1, num_episodes), end="")
         sys.stdout.flush()
-        encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
-        encoded_state = torch.sum(encoded_state, dim=2)
-        q_values = network(encoded_state.view([1, -1]).cuda())[0]
-        action_probs = policy(q_values, epsilon)
+        epsilon = 0.01
+        action_probs = [0.25, 0.25, 0.25, 0.25]
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-        if action == 0:
-            noop_counter += 1
-        else:
-            noop_counter = 0
-        if noop_counter >= 20:
-            action = np.random.choice(np.arange(len(action_probs)))
-            noop_counter = 0
-
         next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
         next_state = torch.clamp(next_obs - obs, min=0)
-        # next_state[77:, :] = next_obs[77:, :]
         next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
         episode_rewards[i_episode] += reward
         episode_lengths[i_episode] = t
@@ -91,5 +67,5 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-np.savetxt('analysis/rewards_dqn_tdg.txt', episode_rewards)
-np.savetxt('analysis/steps_dqn_tdg.txt', episode_lengths)
+np.savetxt('rewards_random.txt', episode_rewards)
+np.savetxt('steps_random.txt', episode_lengths)

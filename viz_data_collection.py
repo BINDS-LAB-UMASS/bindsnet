@@ -55,9 +55,9 @@ else:
     dtype = torch.FloatTensor
 
 # Build network.
-original_network = load_network('model100.p')
+# original_network = load_network('model100.p')
 network = Network(dt=dt)
-dqn_network = torch.load('dqn.pt')
+dqn_network = torch.load('dqn_time_difference_grayscale_paddle.pt')
 
 # Layers of neurons.
 inpt = Input(n=6400, shape=[80, 80], traces=True)  # Input layer
@@ -67,10 +67,10 @@ layers = {'X': inpt, 'E': exc, 'R': readout}
 
 # Connections between layers.
 # Input -> excitatory.
-input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=original_network.connections[('X', 'E')].w)
+input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * 20)
 
 # Excitatory -> readout.
-exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=original_network.connections[('E', 'R')].w)
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * 20)
 
 # Add all layers and connections to the network.
 for layer in layers:
@@ -173,6 +173,7 @@ for i_episode in range(num_episodes):
         # take the next action
         next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
         next_state = torch.clamp(next_obs - obs, min=0)
+        next_state[77:, :] = next_obs[77:, :]
         next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
         episode_rewards[i_episode] += reward
         episode_lengths[i_episode] = t
