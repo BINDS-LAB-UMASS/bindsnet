@@ -30,7 +30,7 @@ hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
 epsilon = 0.0  #probability of picking random action
 accumulator = False
-probabilistic = True
+probabilistic = False
 noop_counter = 0
 
 
@@ -194,8 +194,8 @@ for i in range(1, 11):
     endTime = time()
 
     print("\nTotal time taken:", endTime - startTime)
-    np.savetxt('analysis/rewards_snn_prob_tdg_'+ str(i*10) +'x.txt', episode_rewards)
-    pickle.dump(q_spikes, open("analysis/q_vals_snn_prob_tdg_"+ str(i*10) +"x.txt", "wb"))
+    np.savetxt('analysis/rewards_snn_tdg_'+ str(i*10) +'x.txt', episode_rewards)
+    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_"+ str(i*10) +"x.txt", "wb"))
 
 
 
