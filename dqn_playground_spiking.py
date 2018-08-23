@@ -24,13 +24,13 @@ parser.add_argument('--gpu', dest='gpu', action='store_true')
 parser.set_defaults(plot=False, render=False, gpu=False)
 locals().update(vars(parser.parse_args()))
 
-num_episodes = 100
+num_episodes = 1
 action_pop_size = 1
-hidden_neurons = 1000
+hidden_neurons = 25000
 readout_neurons= 4 * action_pop_size
 epsilon = 0.0  #probability of picking random action
 accumulator = False
-probabilistic = True
+probabilistic = False
 noop_counter = 0
 
 
@@ -65,7 +65,7 @@ else:
 
 dqn_network = torch.load('dqn_time_difference_grayscale.pt')
 
-for i in range(10, 21):
+for i in range(10, 11):
     print("starting for " + str(i*10) + "x weights")
     network = Network(dt=dt, accumulator=accumulator)
 
@@ -77,10 +77,10 @@ for i in range(10, 21):
 
     # Connections between layers.
     # Input -> excitatory.
-    input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000])* i * 10)
+    input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).repeat(1, 25).view([80, 80, 25000])* i * 10)
 
     # Excitatory -> readout.
-    exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * i * 10)
+    exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).repeat(25, 1).view([25000, 4]) * i * 10)
 
     # Add all layers and connections to the network.
     for layer in layers:
