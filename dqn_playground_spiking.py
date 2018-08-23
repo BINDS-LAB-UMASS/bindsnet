@@ -30,7 +30,7 @@ hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
 epsilon = 0.0  #probability of picking random action
 accumulator = False
-probabilistic = False
+probabilistic = True
 noop_counter = 0
 
 
@@ -65,13 +65,13 @@ else:
 
 dqn_network = torch.load('dqn_time_difference_grayscale.pt')
 
-for i in range(1, 11):
+for i in range(10, 21):
     print("starting for " + str(i*10) + "x weights")
     network = Network(dt=dt, accumulator=accumulator)
 
     # Layers of neurons.
     inpt = Input(n=6400, shape=[80, 80], traces=True)  # Input layer
-    exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus= 0.05, theta_decay=1e-7, probabilistic=probabilistic)  # Excitatory layer
+    exc = LIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, probabilistic=probabilistic)  # Excitatory layer
     readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=probabilistic)  # Readout layer
     layers = {'X': inpt, 'E': exc, 'R': readout}
 
@@ -194,8 +194,8 @@ for i in range(1, 11):
     endTime = time()
 
     print("\nTotal time taken:", endTime - startTime)
-    np.savetxt('analysis/rewards_snn_tdg_'+ str(i*10) +'x.txt', episode_rewards)
-    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_"+ str(i*10) +"x.txt", "wb"))
+    np.savetxt('analysis/rewards_snn_tdg__nonadaptive_'+ str(i*10) +'x.txt', episode_rewards)
+    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_nonadaptive_"+ str(i*10) +"x.txt", "wb"))
 
 
 
