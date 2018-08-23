@@ -10,7 +10,7 @@ from collections import deque, namedtuple
 import itertools
 
 isConvNet = False
-network_file = 'dqn_time_difference_grayscale_only_last_paddle.pt'
+network_file = 'dqn_time_difference_grayscale_no_paddle.pt'
 
 
 class Net(nn.Module):
@@ -90,7 +90,6 @@ for i in range(replay_memory_init_size):
     action = np.random.choice(np.arange(total_actions))
     next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
     next_state = torch.clamp(next_obs - obs, min=0)
-    next_state[77:, :] = next_obs[77:, :]
     next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
     replay_memory.append(Transition(state, action, reward, next_state, done))
     if done:
@@ -142,14 +141,13 @@ for i_episode in range(num_episodes):
             else:
                 encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
                 encoded_state = torch.sum(encoded_state, dim=2)
-                encoded_state[77:, :] = state[77:, :, 3]
+                encoded_state[77:, :] = 0
                 encoded_state = encoded_state.view([1, -1])
             q_values = network(encoded_state.cuda())[0]
             action_probs = policy(q_values, epsilon)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
             next_state = torch.clamp(next_obs - obs, min=0)
-            next_state[77:, :] = next_obs[77:, :]
             next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
             replay_memory.append(Transition(state, action, reward, next_state, done))
             episode_rewards[i_episode] += reward
@@ -174,7 +172,7 @@ for i_episode in range(num_episodes):
             for state in next_states_batch:
                 encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
                 encoded_state = torch.sum(encoded_state, dim=2)
-                encoded_state[77:, :] = state[77:, :, 3]
+                encoded_state[77:, :] = 0
                 encoded_state = encoded_state.view([1, -1])
                 temp_next_batch.append(encoded_state)
             next_states_batch = temp_next_batch
