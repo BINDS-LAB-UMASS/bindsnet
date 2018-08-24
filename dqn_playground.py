@@ -8,9 +8,12 @@ from gym import wrappers
 from bindsnet import *
 from collections import deque, namedtuple
 import itertools
+import pickle
 
-num_episodes = 100
-epsilon = 0.0
+num_episodes = 20
+epsilon_decay_steps = 5000
+epsilons = np.linspace(0.5, 0.0, epsilon_decay_steps)
+# epsilon = 0.0
 noop_counter = 0
 
 class Net(nn.Module):
@@ -47,14 +50,28 @@ episode_lengths = np.zeros(num_episodes)
 
 experiment_dir = os.path.abspath("./ann/{}".format(environment.env.spec.id))
 monitor_path = os.path.join(experiment_dir, "monitor")
+
+if not os.path.exists("./data/frames/"):
+    os.makedirs("./data/frames/")
+
+sample_number = 0
+labels = []
+
+def save_state(state):
+    global sample_number
+    encoded_state = torch.sum(torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda(), dim=2)
+    pickle.dump(encoded_state, open('./data/frames/' + str(sample_number) + '.frame', 'wb'))
+    sample_number += 1
+
 environment.env = wrappers.Monitor(environment.env, directory=monitor_path, resume=True)
 
+states = []
 
 def policy(q_values, eps):
     A = np.ones(4, dtype=float) * eps / 4
     best_action = torch.argmax(q_values)
     A[best_action] += (1.0 - eps)
-    return A
+    return A, best_action
 
 for i_episode in range(num_episodes):
     obs = environment.reset()
@@ -66,8 +83,11 @@ for i_episode in range(num_episodes):
         sys.stdout.flush()
         encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
         encoded_state = torch.sum(encoded_state, dim=2)
+        states.append(encoded_state)
         q_values = network(encoded_state.view([1, -1]).cuda())[0]
-        action_probs = policy(q_values, epsilon)
+        epsilon = epsilons[min(total_t, epsilon_decay_steps - 1)]
+        action_probs, best_action = policy(q_values, epsilon)
+        labels.append(best_action)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
         if action == 0:
             noop_counter += 1
@@ -91,5 +111,10 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-np.savetxt('analysis/rewards_dqn_tdg.txt', episode_rewards)
-np.savetxt('analysis/steps_dqn_tdg.txt', episode_lengths)
+
+states = torch.stack(states, dim=0)
+torch.save(states.cpu(), 'frames.pt')
+print(states.shape)
+labels = torch.tensor(labels)
+print(labels.shape)
+torch.save(labels.cpu(), 'labels.pt')
