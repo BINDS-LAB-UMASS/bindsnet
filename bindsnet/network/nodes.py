@@ -87,7 +87,7 @@ class Input(Nodes):
             | :code:`dt` (:code:`float`): Simulation time step.
         '''
         # Set spike occurrences to input values.
-        self.s = inpts.byte()
+        self.s = inpts
 
         super().step(inpts, dt)
 
