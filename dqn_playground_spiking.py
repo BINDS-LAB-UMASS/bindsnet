@@ -24,13 +24,13 @@ parser.add_argument('--gpu', dest='gpu', action='store_true')
 parser.set_defaults(plot=False, render=False, gpu=False)
 locals().update(vars(parser.parse_args()))
 
-num_episodes = 1
+num_episodes = 100
 action_pop_size = 1
-hidden_neurons = 25000
+hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
 epsilon = 0.0  #probability of picking random action
 accumulator = False
-probabilistic = False
+probabilistic = True
 noop_counter = 0
 
 
@@ -65,22 +65,22 @@ else:
 
 dqn_network = torch.load('dqn_time_difference_grayscale.pt')
 
-for i in range(10, 11):
+for i in range(4, 11):
     print("starting for " + str(i*10) + "x weights")
     network = Network(dt=dt, accumulator=accumulator)
 
     # Layers of neurons.
-    inpt = Input(n=6400, shape=[80, 80], traces=True)  # Input layer
-    exc = LIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, probabilistic=probabilistic)  # Excitatory layer
+    inpt = Input(n=6400, shape=[80, 80], traces=False)  # Input layer
+    exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus=0.05, theta_decay=1e-7, probabilistic=probabilistic)  # Excitatory layer
     readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=probabilistic)  # Readout layer
     layers = {'X': inpt, 'E': exc, 'R': readout}
 
     # Connections between layers.
     # Input -> excitatory.
-    input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).repeat(1, 25).view([80, 80, 25000])* i * 10)
+    input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000])* i * 10)
 
     # Excitatory -> readout.
-    exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).repeat(25, 1).view([25000, 4]) * i * 10)
+    exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * i * 10)
 
     # Add all layers and connections to the network.
     for layer in layers:
@@ -150,7 +150,8 @@ for i in range(10, 11):
                 t, total_t, i_episode + 1, num_episodes), end="")
             sys.stdout.flush()
             encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
-            encoded_state = bernoulli(torch.sum(encoded_state, dim=2), runtime)
+            encoded_state = torch.sum(encoded_state, dim=2).unsqueeze(0).repeat(500, 1, 1)
+            # encoded_state = bernoulli(torch.sum(encoded_state, dim=2), runtime)
             inpts = {'X': encoded_state}
             hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
             action_probs = policy(torch.sum(readout_spikes, dim=0), epsilon)
@@ -194,8 +195,8 @@ for i in range(10, 11):
     endTime = time()
 
     print("\nTotal time taken:", endTime - startTime)
-    np.savetxt('analysis/rewards_snn_tdg__nonadaptive_'+ str(i*10) +'x.txt', episode_rewards)
-    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_nonadaptive_"+ str(i*10) +"x.txt", "wb"))
+    np.savetxt('analysis/rewards_snn_tdg_probabilistic_sameinput_'+ str(i*10) +'x.txt', episode_rewards)
+    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_probabilistic_sameinput_"+ str(i*10) +"x.txt", "wb"))
 
 
 
