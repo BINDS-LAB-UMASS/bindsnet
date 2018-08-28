@@ -10,15 +10,15 @@ from collections import deque, namedtuple
 import itertools
 
 isConvNet = False
-network_file = 'dqn_time_difference_grayscale_no_paddle.pt'
+network_file = 'dqn_grayscale_25_neurons.pt'
 
 
 class Net(nn.Module):
 
     def __init__(self):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(6400, 1000)
-        self.fc2 = nn.Linear(1000, 4)
+        self.fc1 = nn.Linear(6400, 25)
+        self.fc2 = nn.Linear(25, 4)
 
 
     def forward(self, x):
@@ -46,7 +46,7 @@ replay_memory_init_size = 50000
 epsilon_start = 1.0
 epsilon_end = 0.1
 epsilon_decay_steps = 200000
-num_episodes = 30000
+num_episodes = 100000
 update_target_estimator_every = 10000
 batch_size = 32
 discount_factor = 0.99
@@ -110,6 +110,8 @@ def policy(q_values, eps):
 total_t = 0
 episode_rewards = np.zeros(num_episodes)
 episode_lengths = np.zeros(num_episodes)
+q_vals = np.zeros(num_episodes)
+
 
 experiment_dir = os.path.abspath("./experiments/{}".format(environment.env.spec.id))
 monitor_path = os.path.join(experiment_dir, "monitor")
@@ -127,6 +129,7 @@ for i_episode in range(num_episodes):
         # Maybe update the target estimator
         if total_t % update_target_estimator_every == 0:
             torch.save(network, network_file)
+            torch.save(q_vals, 'q_vals.pt')
             target_net.load_state_dict(network.state_dict())
             print("\nCopied model parameters to target network.")
 
@@ -141,7 +144,6 @@ for i_episode in range(num_episodes):
             else:
                 encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
                 encoded_state = torch.sum(encoded_state, dim=2)
-                encoded_state[77:, :] = 0
                 encoded_state = encoded_state.view([1, -1])
             q_values = network(encoded_state.cuda())[0]
             action_probs = policy(q_values, epsilon)
@@ -159,6 +161,7 @@ for i_episode in range(num_episodes):
             obs = next_obs
 
         episode_lengths[i_episode] = t
+        q_vals = torch.mean(q_values)
         samples = random.sample(replay_memory, batch_size)
 
         states_batch, action_batch, reward_batch, next_states_batch, done_batch = zip(*samples)
@@ -168,15 +171,7 @@ for i_episode in range(num_episodes):
             next_states_batch = [state.permute(2, 0, 1).unsqueeze(0) for state in next_states_batch]
         else:
             states_batch = [torch.sum(torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda(), dim=2).view(1, -1) for state in states_batch]
-            temp_next_batch = []
-            for state in next_states_batch:
-                encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
-                encoded_state = torch.sum(encoded_state, dim=2)
-                encoded_state[77:, :] = 0
-                encoded_state = encoded_state.view([1, -1])
-                temp_next_batch.append(encoded_state)
-            next_states_batch = temp_next_batch
-            # next_states_batch = [torch.sum(torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda(), dim=2).view(1, -1) for state in next_states_batch]
+            next_states_batch = [torch.sum(torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda(), dim=2).view(1, -1) for state in next_states_batch]
 
         state_action_values = network(torch.cat(states_batch).cuda())
         gather_indices = torch.arange(batch_size) * state_action_values.shape[1] + torch.tensor([float(a) for a in action_batch])
@@ -205,3 +200,4 @@ for i_episode in range(num_episodes):
             break
 
 torch.save(network, network_file)
+torch.save(q_vals, 'q_vals.pt')
