@@ -10,15 +10,15 @@ from collections import deque, namedtuple
 import itertools
 
 isConvNet = False
-network_file = 'dqn_grayscale_25_neurons.pt'
+network_file = 'dqn_grayscale_100_neurons.pt'
 
 
 class Net(nn.Module):
 
     def __init__(self):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(6400, 25)
-        self.fc2 = nn.Linear(25, 4)
+        self.fc1 = nn.Linear(6400, 100)
+        self.fc2 = nn.Linear(100, 4)
 
 
     def forward(self, x):
@@ -50,8 +50,6 @@ num_episodes = 100000
 update_target_estimator_every = 10000
 batch_size = 32
 discount_factor = 0.99
-
-hidden_neurons = 1000
 
 # Atari Actions: 0 (noop), 1 (fire), 2 (right) and 3 (left) are valid actions
 VALID_ACTIONS = [0, 1, 2, 3]
