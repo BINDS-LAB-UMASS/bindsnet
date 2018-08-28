@@ -65,7 +65,7 @@ else:
 
 dqn_network = torch.load('dqn_time_difference_grayscale.pt')
 
-for i in range(4, 11):
+for i in range(1, 2):
     print("starting for " + str(i*10) + "x weights")
     network = Network(dt=dt, accumulator=accumulator)
 
@@ -80,7 +80,7 @@ for i in range(4, 11):
     input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000])* i * 10)
 
     # Excitatory -> readout.
-    exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * i * 10)
+    exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * i * 100)
 
     # Add all layers and connections to the network.
     for layer in layers:
@@ -195,8 +195,8 @@ for i in range(4, 11):
     endTime = time()
 
     print("\nTotal time taken:", endTime - startTime)
-    np.savetxt('analysis/rewards_snn_tdg_probabilistic_sameinput_'+ str(i*10) +'x.txt', episode_rewards)
-    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_probabilistic_sameinput_"+ str(i*10) +"x.txt", "wb"))
+    np.savetxt('analysis/rewards_snn_tdg_probabilistic_sameinput_10x_100x.txt', episode_rewards)
+    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_probabilistic_sameinput_10x_100x.txt", "wb"))
 
 
 
