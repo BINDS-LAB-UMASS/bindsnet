@@ -10,20 +10,20 @@ from collections import deque, namedtuple
 import itertools
 
 isConvNet = False
-network_file = 'dqn_grayscale_100_neurons.pt'
+network_file = 'dqn_grayscale_2relus_neurons.pt'
 
 
 class Net(nn.Module):
 
     def __init__(self):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(6400, 100)
-        self.fc2 = nn.Linear(100, 4)
+        self.fc1 = nn.Linear(6400, 1000)
+        self.fc2 = nn.Linear(1000, 4)
 
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = self.fc2(x)
+        x = F.relu(self.fc2(x))
         return x
 
 
@@ -46,7 +46,7 @@ replay_memory_init_size = 50000
 epsilon_start = 1.0
 epsilon_end = 0.1
 epsilon_decay_steps = 200000
-num_episodes = 100000
+num_episodes = 30000
 update_target_estimator_every = 10000
 batch_size = 32
 discount_factor = 0.99
