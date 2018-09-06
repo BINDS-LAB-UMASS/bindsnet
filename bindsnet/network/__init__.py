@@ -2,7 +2,7 @@ import torch
 
 from typing import Dict
 
-from .nodes import AbstractInput, Nodes
+from .nodes import Input, Nodes
 from .topology import AbstractConnection
 from .monitors import AbstractMonitor
 
@@ -254,7 +254,7 @@ class Network:
                     )
 
                 # Update each layer of nodes.
-                if isinstance(self.layers[l], AbstractInput):
+                if type(self.layers[l]) is Input:
                     self.layers[l].step(inpts[l][t], self.dt)
                 else:
                     self.layers[l].step(inpts[l], self.dt)
