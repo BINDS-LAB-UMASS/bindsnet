@@ -30,7 +30,7 @@ hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
 epsilon = 0.0  #probability of picking random action
 accumulator = False
-probabilistic = True
+probabilistic = False
 noop_counter = 0
 
 
@@ -78,10 +78,10 @@ for i in range(1, 2):
 
     # Connections between layers.
     # Input -> excitatory.
-    input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000])* i * 0.5)
+    input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000])* i * 10)
 
     # Excitatory -> readout.
-    exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * i * 0.3)
+    exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * i * 1)
 
     # Add all layers and connections to the network.
     for layer in layers:
@@ -196,8 +196,8 @@ for i in range(1, 2):
     endTime = time()
 
     print("\nTotal time taken:", endTime - startTime)
-    np.savetxt('analysis/rewards_snn_tdg_probabilistic_nonAdaptive_sameinput_0.5x0.3x.txt', episode_rewards)
-    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_probabilistic_nonAdaptive_sameinput__0.5x0.3x.txt", "wb"))
+    np.savetxt('analysis/rewards_snn_tdg_nonAdaptive_sameinput_10x1x.txt', episode_rewards)
+    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_nonAdaptive_sameinput_10x1x.txt", "wb"))
 
 
 
