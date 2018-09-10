@@ -30,8 +30,9 @@ hidden_neurons = 1000
 readout_neurons= 4 * action_pop_size
 epsilon = 0.0  #probability of picking random action
 accumulator = False
-probabilistic = True
+probabilistic = False
 noop_counter = 0
+new_life = True
 
 
 class Net(nn.Module):
@@ -145,6 +146,7 @@ for i in range(1, 2):
     for i_episode in range(num_episodes):
         obs = environment.reset()
         state = torch.stack([obs] * 4, dim=2)
+        prev_life = 5
 
         for t in itertools.count():
             print("\rStep {} ({}) @ Episode {}/{}".format(
@@ -164,7 +166,16 @@ for i in range(1, 2):
             if noop_counter >= 20:
                 action = np.random.choice(np.arange(len(action_probs)))
                 noop_counter = 0
-            next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
+            if new_life:
+                action = 1
+
+            next_obs, reward, done, info = environment.step(VALID_ACTIONS[action])
+            if prev_life - info["ale.lives"] != 0:
+                new_life = True
+            else:
+                new_life = False
+
+            prev_life = info["ale.lives"]
             next_state = torch.clamp(next_obs - obs, min=0)
             next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
             episode_rewards[i_episode] += reward
@@ -196,8 +207,8 @@ for i in range(1, 2):
     endTime = time()
 
     print("\nTotal time taken:", endTime - startTime)
-    np.savetxt('analysis/rewards_snn_tdg_nonAdaptive_probabilistic_sameinput_10x1x.txt', episode_rewards)
-    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_nonAdaptive_probabilistic_sameinput_10x1x.txt", "wb"))
+    np.savetxt('analysis/rewards_snn_tdg_nonAdaptive_sameinput_10x1x.txt', episode_rewards)
+    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_nonAdaptive_sameinput_10x1x.txt", "wb"))
 
 
 
