@@ -196,7 +196,7 @@ class IFNodes(Nodes):
         Resets relevant state variables.
         '''
         super()._reset()
-        self.v = self.rest * torch.ones(self.shape)  # Neuron voltages.
+        self.v = self.reset * torch.ones(self.shape)  # Neuron voltages.
         self.refrac_count = torch.zeros(self.shape)  # Refractory period counters.
 
 
