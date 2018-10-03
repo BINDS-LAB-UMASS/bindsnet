@@ -33,6 +33,7 @@ accumulator = False
 probabilistic = False
 noop_counter = 0
 new_life = True
+bias = False
 
 
 class Net(nn.Module):
@@ -72,20 +73,29 @@ for i in range(1, 2):
 
     # Layers of neurons.
     inpt = Input(n=6400, traces=False)  # Input layer
+    bias1 = Input(n=1, traces=False) # bias 1
     # exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus=0.05, theta_decay=1e-7, probabilistic=probabilistic)  # Excitatory layer
-    # exc = LIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, probabilistic=probabilistic)  # Excitatory layer
-    exc = IFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52.0, reset=-65.0)  # Excitatory layer
-    # readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=probabilistic)  # Readout layer
-    readout = IFNodes(n=4, refrac=0, traces=True, thresh=-52.0, reset=-65.0)  # Readout layer
+    exc = LIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, probabilistic=probabilistic)  # Excitatory layer
+    # exc = IFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52.0, reset=-65.0)  # Excitatory layer
+    bias2 = Input(n=1, traces=False) #bias 2
+    readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=probabilistic)  # Readout layer
+    # readout = IFNodes(n=4, refrac=0, traces=True, thresh=-52.0, reset=-65.0)  # Readout layer
 
-    layers = {'X': inpt, 'E': exc, 'R': readout}
+    if bias:
+        layers = {'X': inpt, 'B1': bias1, 'E': exc, 'B2': bias2, 'R': readout}
+    else:
+        layers = {'X': inpt, 'E': exc, 'R': readout}
 
     # Connections between layers.
     # Input -> excitatory.
-    input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1) * i * 1)
+    input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1) * i * 5)
+    if bias:
+        bias1_exc_conn = Connection(source=layers['B1'], target=layers['E'], w=dqn_network.fc1.bias.unsqueeze(0) * 10)
 
     # Excitatory -> readout.
     exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * i * 1)
+    if bias:
+        bias2_exc_conn = Connection(source=layers['B2'], target=layers['R'], w=dqn_network.fc2.bias.unsqueeze(0) * 10)
 
     # Add all layers and connections to the network.
     for layer in layers:
@@ -107,7 +117,11 @@ for i in range(1, 2):
         network.add_monitor(spikes[layer], name='%s_spikes' % layer)
 
     network.add_connection(input_exc_conn, source='X', target='E')
+    if bias:
+        network.add_connection(bias1_exc_conn, source='B1', target='E')
     network.add_connection(exc_readout_conn, source='E', target='R')
+    if bias:
+        network.add_connection(bias2_exc_conn, source='B2', target='R')
 
     # Voltage recording for excitatory and inhibitory layers.
     exc_voltage_monitor = Monitor(network.layers['E'], ['v'], time=runtime)
@@ -156,10 +170,13 @@ for i in range(1, 2):
                 t, total_t, i_episode + 1, num_episodes), end="")
             sys.stdout.flush()
             encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
-            encoded_state = torch.sum(encoded_state, dim=2).view([1, -1]).repeat(500, 1)
+            encoded_state = torch.sum(encoded_state, dim=2)
+            encoded_state[77:, :] = 0
+            encoded_state = encoded_state.view([1, -1]).repeat(500, 1)
             # encoded_state = bernoulli(torch.sum(encoded_state, dim=2), runtime)
-            inpts = {'X': encoded_state}
+            inpts = {'X': encoded_state, 'B1': torch.ones(500, 1), 'B2': torch.ones(500, 1)}
             hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
+            # print(torch.sum(readout_spikes, dim=0))
             action_probs = policy(torch.sum(readout_spikes, dim=0), epsilon)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             if action == 0:
@@ -210,8 +227,8 @@ for i in range(1, 2):
     endTime = time()
 
     print("\nTotal time taken:", endTime - startTime)
-    np.savetxt('analysis/rewards_snn_tdg_if_sameinput_1x1x.txt', episode_rewards)
-    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_if_sameinput_1x1x.txt", "wb"))
+    np.savetxt('analysis/rewards_snn_tdg_if_sameinput_5x1x_no_paddle.txt', episode_rewards)
+    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_if_sameinput_5x1x.txt", "wb"))
 
 
 

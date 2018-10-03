@@ -234,16 +234,20 @@ class Network:
         # Effective number of timesteps
         timesteps = int(time / self.dt)
         # Get input to all layers.
-        # inpts.update(self.get_inputs())
 
         input = inpts['X']
+        # bias1 = inpts['B1']
+        # bias2 = inpts['B2']
+
+        # inpts.update(self.get_inputs())
+
 
         # Simulate network activity for `time` timesteps.
         hidden_spikes = torch.zeros_like(self.layers['E'].s)
         readout_spikes = torch.zeros(timesteps, self.layers['R'].s.shape[0])
         self._reset()
         for t in range(timesteps):
-            # Update each layer of nodes.
+            #Update each layer of nodes.
             for c in self.connections:
                 if type(self.layers[c[0]]) is Input:
                     self.layers[c[0]].step(input[t, :], self.dt)
@@ -279,6 +283,13 @@ class Network:
             #     clamp = clamps.get(l, None)
             #     if clamp is not None:
             #         self.layers[l].s[clamp] = 1
+            #     if l is 'E':
+            #         hidden_spikes += self.layers[l].s
+            #     elif l is 'R':
+            #         readout_spikes[t] = self.layers[l].s
+            #
+            # # Get input to all layers.
+            # inpts.update(self.get_inputs())
 
             # Run synapse updates.
             # for c in self.connections:
