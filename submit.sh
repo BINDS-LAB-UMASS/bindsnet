@@ -5,7 +5,8 @@
 #SBATCH --time=10:00
 #SBATCH --mem=8000
 #SBATCH --account=rkozma
-#SBATCH --output=../../output/dqn_playground_spiking_%j.out
+#SBATCH --output=res_%j.txt
+#SBATCH -e res_%j.err
 
 layer1scale=${1:-1}
 layer2scale=${2:-1}
