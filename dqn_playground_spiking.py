@@ -21,16 +21,19 @@ parser.add_argument('--plot_interval', type=int, default=None)
 parser.add_argument('--plot', dest='plot', action='store_true')
 parser.add_argument('--print_interval', type=int, default=None)
 parser.add_argument('--gpu', dest='gpu', action='store_true')
+parser.add_argument('--layer1scale', dest='layer1scale', type=float, default=1)
+parser.add_argument('--layer2scale', dest='layer2scale', type=float, default=1)
 parser.set_defaults(plot=False, render=False, gpu=False)
+
 locals().update(vars(parser.parse_args()))
 
 num_episodes = 100
 action_pop_size = 1
 hidden_neurons = 1000
-readout_neurons= 4 * action_pop_size
-epsilon = 0.0  #probability of picking random action
+readout_neurons = 4 * action_pop_size
+epsilon = 0.0  # probability of picking random action
 accumulator = False
-probabilistic = False
+probabilistic = True
 noop_counter = 0
 new_life = True
 bias = False
@@ -42,7 +45,6 @@ class Net(nn.Module):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(6400, 1000)
         self.fc2 = nn.Linear(1000, 4)
-
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -67,168 +69,167 @@ else:
 
 dqn_network = torch.load('trained models/dqn_time_difference_grayscale.pt')
 
-for i in range(1, 2):
-    print("starting for " + str(i*10) + "x weights")
-    network = Network(dt=dt, accumulator=accumulator)
+network = Network(dt=dt, accumulator=accumulator)
 
-    # Layers of neurons.
-    inpt = Input(n=6400, traces=False)  # Input layer
-    bias1 = Input(n=1, traces=False) # bias 1
-    # exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus=0.05, theta_decay=1e-7, probabilistic=probabilistic)  # Excitatory layer
-    exc = LIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, probabilistic=probabilistic)  # Excitatory layer
-    # exc = IFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52.0, reset=-65.0)  # Excitatory layer
-    bias2 = Input(n=1, traces=False) #bias 2
-    readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2, probabilistic=probabilistic)  # Readout layer
-    # readout = IFNodes(n=4, refrac=0, traces=True, thresh=-52.0, reset=-65.0)  # Readout layer
+# Layers of neurons.
+inpt = Input(n=6400, traces=False)  # Input layer
+bias1 = Input(n=1, traces=False)  # bias 1
+# exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus=0.05, theta_decay=1e-7, probabilistic=probabilistic)  # Excitatory layer
+exc = LIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2,
+               probabilistic=probabilistic)  # Excitatory layer
+# exc = IFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52.0, reset=-65.0)  # Excitatory layer
+bias2 = Input(n=1, traces=False)  # bias 2
+readout = LIFNodes(n=4, refrac=0, traces=True, thresh=-52.0, rest=-65.0, decay=1e-2,
+                   probabilistic=probabilistic)  # Readout layer
+# readout = IFNodes(n=4, refrac=0, traces=True, thresh=-52.0, reset=-65.0)  # Readout layer
 
-    if bias:
-        layers = {'X': inpt, 'B1': bias1, 'E': exc, 'B2': bias2, 'R': readout}
-    else:
-        layers = {'X': inpt, 'E': exc, 'R': readout}
+if bias:
+    layers = {'X': inpt, 'B1': bias1, 'E': exc, 'B2': bias2, 'R': readout}
+else:
+    layers = {'X': inpt, 'E': exc, 'R': readout}
 
-    # Connections between layers.
-    # Input -> excitatory.
-    input_exc_conn = Connection(source=layers['X'], target=layers['E'], w=torch.transpose(dqn_network.fc1.weight, 0, 1) * i * 5)
-    if bias:
-        bias1_exc_conn = Connection(source=layers['B1'], target=layers['E'], w=dqn_network.fc1.bias.unsqueeze(0) * 10)
+# Connections between layers.
+# Input -> excitatory.
+input_exc_conn = Connection(source=layers['X'], target=layers['E'],
+                            w=torch.transpose(dqn_network.fc1.weight, 0, 1) * layer1scale)
+if bias:
+    bias1_exc_conn = Connection(source=layers['B1'], target=layers['E'], w=dqn_network.fc1.bias.unsqueeze(0) * 10)
 
-    # Excitatory -> readout.
-    exc_readout_conn = Connection(source=layers['E'], target=layers['R'], w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * i * 1)
-    if bias:
-        bias2_exc_conn = Connection(source=layers['B2'], target=layers['R'], w=dqn_network.fc2.bias.unsqueeze(0) * 10)
+# Excitatory -> readout.
+exc_readout_conn = Connection(source=layers['E'], target=layers['R'],
+                              w=torch.transpose(dqn_network.fc2.weight, 0, 1).view([1000, 4]) * layer2scale)
+if bias:
+    bias2_exc_conn = Connection(source=layers['B2'], target=layers['R'], w=dqn_network.fc2.bias.unsqueeze(0) * 10)
 
-    # Add all layers and connections to the network.
-    for layer in layers:
-        network.add_layer(layers[layer], name=layer)
+# Add all layers and connections to the network.
+for layer in layers:
+    network.add_layer(layers[layer], name=layer)
+
+# Load SpaceInvaders environment.
+environment = GymEnvironment('BreakoutDeterministic-v4')
+
+experiment_dir = os.path.abspath("./snn/{}".format(environment.env.spec.id))
+monitor_path = os.path.join(experiment_dir, "monitor")
+environment.env = wrappers.Monitor(environment.env, directory=monitor_path, resume=True)
+
+spikes = {}
+
+# Add all monitors to the network.
+for layer in set(network.layers):
+    spikes[layer] = Monitor(network.layers[layer], state_vars=['s'], time=runtime)
+    network.add_monitor(spikes[layer], name='%s_spikes' % layer)
+
+network.add_connection(input_exc_conn, source='X', target='E')
+if bias:
+    network.add_connection(bias1_exc_conn, source='B1', target='E')
+network.add_connection(exc_readout_conn, source='E', target='R')
+if bias:
+    network.add_connection(bias2_exc_conn, source='B2', target='R')
+
+# Voltage recording for excitatory and inhibitory layers.
+exc_voltage_monitor = Monitor(network.layers['E'], ['v'], time=runtime)
+readout_voltage_monitor = Monitor(network.layers['R'], ['v'], time=runtime)
+network.add_monitor(exc_voltage_monitor, name='exc_voltage')
+network.add_monitor(readout_voltage_monitor, name='readout_voltage')
+
+total_t = 0
+episode_rewards = np.zeros(num_episodes)
+q_spikes = []
 
 
-    # Load SpaceInvaders environment.
-    environment = GymEnvironment('BreakoutDeterministic-v4')
+def policy(rspikes, eps):
+    q_values = torch.Tensor([rspikes[(i * action_pop_size):(i * action_pop_size) + action_pop_size].sum()
+                             for i in range(total_actions)])
+    A = np.ones(4, dtype=float) * eps / 4
+    if torch.max(q_values) == 0:
+        return [0.25, 0.25, 0.25, 0.25]
+    best_action = torch.argmax(q_values)
+    A[best_action] += (1.0 - eps)
+    return A
 
-    experiment_dir = os.path.abspath("./snn/{}".format(environment.env.spec.id))
-    monitor_path = os.path.join(experiment_dir, "monitor")
-    environment.env = wrappers.Monitor(environment.env, directory=monitor_path, resume=True)
 
-    spikes = {}
+# Get voltage recording.
+exc_voltages = exc_voltage_monitor.get('v')
+readout_voltages = readout_voltage_monitor.get('v')
 
-    # Add all monitors to the network.
-    for layer in set(network.layers):
-        spikes[layer] = Monitor(network.layers[layer], state_vars=['s'], time=runtime)
-        network.add_monitor(spikes[layer], name='%s_spikes' % layer)
+obs = environment.reset()
+state = obs
 
-    network.add_connection(input_exc_conn, source='X', target='E')
-    if bias:
-        network.add_connection(bias1_exc_conn, source='B1', target='E')
-    network.add_connection(exc_readout_conn, source='E', target='R')
-    if bias:
-        network.add_connection(bias2_exc_conn, source='B2', target='R')
+if plot:
+    voltages = {'E': exc_voltages, 'R': readout_voltages}
+    inpt = bernoulli(state, runtime).view(runtime, 6400).sum(0).view(80, 80)
+    spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes})
+    inpt_axes, inpt_ims = plot_input(state, inpt)
+    voltage_ims, voltage_axes = plot_voltages(voltages)
+    plt.pause(1e-8)
 
-    # Voltage recording for excitatory and inhibitory layers.
-    exc_voltage_monitor = Monitor(network.layers['E'], ['v'], time=runtime)
-    readout_voltage_monitor = Monitor(network.layers['R'], ['v'], time=runtime)
-    network.add_monitor(exc_voltage_monitor, name='exc_voltage')
-    network.add_monitor(readout_voltage_monitor, name='readout_voltage')
+startTime = time()
 
-    total_t = 0
-    episode_rewards = np.zeros(num_episodes)
-    q_spikes = []
-
-    def policy(rspikes, eps):
-        q_values = torch.Tensor([rspikes[(i * action_pop_size):(i * action_pop_size) + action_pop_size].sum()
-                                   for i in range(total_actions)])
-        A = np.ones(4, dtype=float) * eps / 4
-        if torch.max(q_values) == 0:
-            return [0.25, 0.25, 0.25, 0.25]
-        best_action = torch.argmax(q_values)
-        A[best_action] += (1.0 - eps)
-        return A
-
-    # Get voltage recording.
-    exc_voltages = exc_voltage_monitor.get('v')
-    readout_voltages = readout_voltage_monitor.get('v')
-
+for i_episode in range(num_episodes):
     obs = environment.reset()
-    state = obs
+    state = torch.stack([obs] * 4, dim=2)
+    prev_life = 5
 
-    if plot:
-        voltages = {'E': exc_voltages, 'R': readout_voltages}
-        inpt = bernoulli(state, runtime).view(runtime, 6400).sum(0).view(80, 80)
-        spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes})
-        inpt_axes, inpt_ims = plot_input(state, inpt)
-        voltage_ims, voltage_axes = plot_voltages(voltages)
-        plt.pause(1e-8)
+    for t in itertools.count():
+        print("\rStep {} ({}) @ Episode {}/{}".format(
+            t, total_t, i_episode + 1, num_episodes), end="")
+        sys.stdout.flush()
+        encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
+        encoded_state = torch.sum(encoded_state, dim=2)
+        encoded_state[77:, :] = 0
+        encoded_state = encoded_state.view([1, -1]).repeat(500, 1)
+        # encoded_state = bernoulli(torch.sum(encoded_state, dim=2), runtime)
+        inpts = {'X': encoded_state, 'B1': torch.ones(500, 1), 'B2': torch.ones(500, 1)}
+        hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
+        # print(torch.sum(readout_spikes, dim=0))
+        action_probs = policy(torch.sum(readout_spikes, dim=0), epsilon)
+        action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+        if action == 0:
+            noop_counter += 1
+        else:
+            noop_counter = 0
+        if noop_counter >= 20:
+            action = np.random.choice(np.arange(len(action_probs)))
+            noop_counter = 0
+        if new_life:
+            action = 1
 
-    startTime = time()
+        next_obs, reward, done, info = environment.step(VALID_ACTIONS[action])
+        if prev_life - info["ale.lives"] != 0:
+            new_life = True
+        else:
+            new_life = False
 
-    for i_episode in range(num_episodes):
-        obs = environment.reset()
-        state = torch.stack([obs] * 4, dim=2)
-        prev_life = 5
+        prev_life = info["ale.lives"]
+        next_state = torch.clamp(next_obs - obs, min=0)
+        next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
+        episode_rewards[i_episode] += reward
+        q_spikes.append(torch.sum(readout_spikes, dim=0))
+        total_t += 1
 
-        for t in itertools.count():
-            print("\rStep {} ({}) @ Episode {}/{}".format(
-                t, total_t, i_episode + 1, num_episodes), end="")
-            sys.stdout.flush()
-            encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
-            encoded_state = torch.sum(encoded_state, dim=2)
-            encoded_state[77:, :] = 0
-            encoded_state = encoded_state.view([1, -1]).repeat(500, 1)
-            # encoded_state = bernoulli(torch.sum(encoded_state, dim=2), runtime)
-            inpts = {'X': encoded_state, 'B1': torch.ones(500, 1), 'B2': torch.ones(500, 1)}
-            hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
-            # print(torch.sum(readout_spikes, dim=0))
-            action_probs = policy(torch.sum(readout_spikes, dim=0), epsilon)
-            action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-            if action == 0:
-                noop_counter += 1
-            else:
-                noop_counter = 0
-            if noop_counter >= 20:
-                action = np.random.choice(np.arange(len(action_probs)))
-                noop_counter = 0
-            if new_life:
-                action = 1
+        if plot:
+            # Get voltage recording.
+            exc_voltages = exc_voltage_monitor.get('v')
+            readout_voltages = readout_voltage_monitor.get('v')
+            voltages = {'E': exc_voltages, 'R': readout_voltages}
+            inpt = encoded_state.view(runtime, 6400).sum(0).view(80, 80)
+            spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes}, ims=spike_ims,
+                                                axes=spike_axes)
+            inpt_axes, inpt_ims = plot_input(state, inpt, axes=inpt_axes, ims=inpt_ims)
+            voltage_ims, voltage_axes = plot_voltages(voltages, ims=voltage_ims, axes=voltage_axes)
+            plt.pause(1e-8)
 
-            next_obs, reward, done, info = environment.step(VALID_ACTIONS[action])
-            if prev_life - info["ale.lives"] != 0:
-                new_life = True
-            else:
-                new_life = False
+        if done:
+            print("\nEpisode Reward: {}".format(episode_rewards[i_episode]))
+            break
 
-            prev_life = info["ale.lives"]
-            next_state = torch.clamp(next_obs - obs, min=0)
-            next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
-            episode_rewards[i_episode] += reward
-            q_spikes.append(torch.sum(readout_spikes, dim=0))
-            total_t += 1
+        state = next_state
+        obs = next_obs
 
-            if plot:
-                # Get voltage recording.
-                exc_voltages = exc_voltage_monitor.get('v')
-                readout_voltages = readout_voltage_monitor.get('v')
-                voltages = {'E': exc_voltages, 'R': readout_voltages}
-                inpt = encoded_state.view(runtime, 6400).sum(0).view(80, 80)
-                spike_ims, spike_axes = plot_spikes({layer: spikes[layer].get('s') for layer in spikes}, ims=spike_ims,
-                                                    axes=spike_axes)
-                inpt_axes, inpt_ims = plot_input(state, inpt, axes=inpt_axes, ims=inpt_ims)
-                voltage_ims, voltage_axes = plot_voltages(voltages, ims=voltage_ims, axes=voltage_axes)
-                plt.pause(1e-8)
+    # np.savetxt('analysis/rewards_snn_prob_tdg_10_100x.txt', episode_rewards)
+    # pickle.dump(q_values, open("analysis/q_vals_snn_prob_tdg_10_100x.txt", "wb"))
 
-            if done:
-                print("\nEpisode Reward: {}".format(episode_rewards[i_episode]))
-                break
+endTime = time()
 
-            state = next_state
-            obs = next_obs
-
-        # np.savetxt('analysis/rewards_snn_prob_tdg_10_100x.txt', episode_rewards)
-        # pickle.dump(q_values, open("analysis/q_vals_snn_prob_tdg_10_100x.txt", "wb"))
-
-    endTime = time()
-
-    print("\nTotal time taken:", endTime - startTime)
-    np.savetxt('analysis/rewards_snn_tdg_if_sameinput_5x1x_no_paddle.txt', episode_rewards)
-    pickle.dump(q_spikes, open("analysis/q_vals_snn_tdg_if_sameinput_5x1x.txt", "wb"))
-
-
-
+print("\nTotal time taken:", endTime - startTime)
+np.savetxt('analysis/rewards_snn_tdg_sameinput_probabilistic_non_adaptive_'+str(layer1scale)+'x'+str(layer2scale)+'x.txt', episode_rewards)
