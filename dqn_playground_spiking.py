@@ -171,8 +171,6 @@ for i_episode in range(num_episodes):
     prev_life = 5
 
     for t in itertools.count():
-        print("\rStep {} ({}) @ Episode {}/{}".format(
-            t, total_t, i_episode + 1, num_episodes), end="")
         sys.stdout.flush()
         encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
         encoded_state = torch.sum(encoded_state, dim=2)
@@ -220,6 +218,7 @@ for i_episode in range(num_episodes):
             plt.pause(1e-8)
 
         if done:
+            print("\rStep {} ({}) @ Episode {}/{}".format(t, total_t, i_episode + 1, num_episodes), end="")
             print("\nEpisode Reward: {}".format(episode_rewards[i_episode]))
             break
 
