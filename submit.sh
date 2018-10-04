@@ -7,6 +7,7 @@
 #SBATCH --account=rkozma
 #SBATCH --output=res_%j.txt
 #SBATCH -e res_%j.err
+#SBATCH --gres=gpu:1
 
 layer1scale=${1:-1}
 layer2scale=${2:-1}
