@@ -10,8 +10,6 @@
 layer1scale=${1:-1}
 layer2scale=${2:-1}
 
-source activate py36
-
 echo $layer1scale $layer2scale
 
 python dqn_playground_spiking.py --layer1scale $layer1scale --layer2scale $layer2scale
