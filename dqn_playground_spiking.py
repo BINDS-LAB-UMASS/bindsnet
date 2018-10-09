@@ -174,7 +174,6 @@ for i_episode in range(num_episodes):
         sys.stdout.flush()
         encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
         encoded_state = torch.sum(encoded_state, dim=2)
-        encoded_state[77:, :] = 0
         encoded_state = encoded_state.view([1, -1]).repeat(500, 1)
         # encoded_state = bernoulli(torch.sum(encoded_state, dim=2), runtime)
         inpts = {'X': encoded_state, 'B1': torch.ones(500, 1), 'B2': torch.ones(500, 1)}
