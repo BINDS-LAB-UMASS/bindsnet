@@ -2,7 +2,7 @@
 #
 #SBATCH --job-name=probabilistic_param_search
 #SBATCH --partition=1080ti-long
-#SBATCH --time=00-10:00:00
+#SBATCH --time=00-18:00:00
 #SBATCH --mem=8000
 #SBATCH --account=rkozma
 #SBATCH --output=res_%j.txt
