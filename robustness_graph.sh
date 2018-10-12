@@ -6,7 +6,7 @@ do
     do
         for occlusionloc in {0..77}
         do
-            sbatch submit.sh $layer1scale
+            sbatch submit.sh $layer1scale $layer2scale $occlusionloc
         done
     done
 done

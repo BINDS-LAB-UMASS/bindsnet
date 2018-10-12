@@ -9,6 +9,12 @@ from bindsnet import *
 from collections import deque, namedtuple
 import itertools
 import pickle
+import argparse
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--occlusionloc', dest='occlusionloc', type=int, default=0)
+
 
 num_episodes = 100
 epsilon_decay_steps = 5000
@@ -16,13 +22,13 @@ epsilon_decay_steps = 5000
 epsilon = 0.0
 noop_counter = 0
 
+
 class Net(nn.Module):
 
     def __init__(self):
         super(Net, self).__init__()
         self.fc1 = nn.Linear(6400, 1000)
         self.fc2 = nn.Linear(1000, 4)
-
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -38,7 +44,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if torch.cuda.is_available():
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-
 
 # Load SpaceInvaders environment.
 environment = GymEnvironment('BreakoutDeterministic-v4')
@@ -69,6 +74,7 @@ monitor_path = os.path.join(experiment_dir, "monitor")
 
 environment.env = wrappers.Monitor(environment.env, directory=monitor_path, resume=True)
 
+
 # states = []
 
 def policy(q_values, eps):
@@ -78,47 +84,45 @@ def policy(q_values, eps):
     return A, best_action
 
 
-for occlusionloc in range(0, 77):
-    for i_episode in range(num_episodes):
-        obs = environment.reset()
-        state = torch.stack([obs] * 4, dim=2)
+for i_episode in range(num_episodes):
+    obs = environment.reset()
+    state = torch.stack([obs] * 4, dim=2)
 
-        for t in itertools.count():
-            print("\rStep {} ({}) @ Episode {}/{}".format(
-                t, total_t, i_episode + 1, num_episodes), end="")
-            sys.stdout.flush()
-            encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
-            encoded_state = torch.sum(encoded_state, dim=2)
-            # states.append(encoded_state)
-            encoded_state[80 - 3 - occlusionloc:80 - occlusionloc, :] = 0
-            q_values = network(encoded_state.view([1, -1]).cuda())[0]
-            # epsilon = epsilons[min(total_t, epsilon_decay_steps - 1)]
-            action_probs, best_action = policy(q_values, epsilon)
-            # labels.append(best_action)
-            action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-            if action == 0:
-                noop_counter += 1
-            else:
-                noop_counter = 0
-            if noop_counter >= 20:
-                action = np.random.choice(np.arange(len(action_probs)))
-                noop_counter = 0
+    for t in itertools.count():
+        print("\rStep {} ({}) @ Episode {}/{}".format(
+            t, total_t, i_episode + 1, num_episodes), end="")
+        sys.stdout.flush()
+        encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
+        encoded_state = torch.sum(encoded_state, dim=2)
+        # states.append(encoded_state)
+        encoded_state[80 - 3 - occlusionloc:80 - occlusionloc, :] = 0
+        q_values = network(encoded_state.view([1, -1]).cuda())[0]
+        # epsilon = epsilons[min(total_t, epsilon_decay_steps - 1)]
+        action_probs, best_action = policy(q_values, epsilon)
+        # labels.append(best_action)
+        action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+        if action == 0:
+            noop_counter += 1
+        else:
+            noop_counter = 0
+        if noop_counter >= 20:
+            action = np.random.choice(np.arange(len(action_probs)))
+            noop_counter = 0
 
-            next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
-            next_state = torch.clamp(next_obs - obs, min=0)
-            next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
-            episode_rewards[i_episode] += reward
-            episode_lengths[i_episode] = t
-            total_t += 1
-            if done:
-                print("\nEpisode Reward: {}".format(episode_rewards[i_episode]))
-                break
+        next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
+        next_state = torch.clamp(next_obs - obs, min=0)
+        next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
+        episode_rewards[i_episode] += reward
+        episode_lengths[i_episode] = t
+        total_t += 1
+        if done:
+            print("\nEpisode Reward: {}".format(episode_rewards[i_episode]))
+            break
 
-            state = next_state
-            obs = next_obs
+        state = next_state
+        obs = next_obs
 
-
-    np.savetxt('analysis/rewards_dqn_robustness_'+str(occlusionloc)+'.txt', episode_rewards)
+np.savetxt('analysis/rewards_dqn_robustness_' + str(occlusionloc) + '.txt', episode_rewards)
 
 # states = torch.stack(states, dim=0)
 # torch.save(states.cpu(), 'frames.pt')
