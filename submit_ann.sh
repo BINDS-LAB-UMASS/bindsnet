@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
 #SBATCH --job-name=probabilistic_param_search
-#SBATCH --partition=1080ti-short
-#SBATCH --time=00-00:10:00
+#SBATCH --partition=1080ti-long
+#SBATCH --time=01-00:00:00
 #SBATCH --mem=8000
 #SBATCH --account=rkozma
 #SBATCH --output=res_%j.txt
 #SBATCH -e res_%j.err
 #SBATCH --gres=gpu:1
 
-occlusionloc=${3:-0}
+occlusionloc=${1:-0}
 
 echo $occlusionloc
 
