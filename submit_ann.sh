@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 #SBATCH --job-name=probabilistic_param_search
-#SBATCH --partition=1080ti-long
-#SBATCH --time=01-00:00:00
+#SBATCH --partition=1080ti-short
+#SBATCH --time=00-01:00:00
 #SBATCH --mem=8000
 #SBATCH --account=rkozma
 #SBATCH --output=res_%j.txt
@@ -13,5 +13,5 @@ occlusionloc=${1:-0}
 
 echo $occlusionloc
 
-python3 dqn_playground_spiking.py --occlusionloc $occlusionloc
+python3 dqn_playground.py --occlusionloc $occlusionloc
 exit

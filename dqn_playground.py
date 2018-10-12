@@ -15,6 +15,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--occlusionloc', dest='occlusionloc', type=int, default=0)
 
+locals().update(vars(parser.parse_args()))
 
 num_episodes = 100
 epsilon_decay_steps = 5000
