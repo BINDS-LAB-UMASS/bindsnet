@@ -90,7 +90,7 @@ for occlusionloc in range(0, 77):
             encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
             encoded_state = torch.sum(encoded_state, dim=2)
             # states.append(encoded_state)
-            encoded_state[77:, :] = 0
+            encoded_state[80 - 3 - occlusionloc:80 - occlusionloc, :] = 0
             q_values = network(encoded_state.view([1, -1]).cuda())[0]
             # epsilon = epsilons[min(total_t, epsilon_decay_steps - 1)]
             action_probs, best_action = policy(q_values, epsilon)
@@ -106,7 +106,6 @@ for occlusionloc in range(0, 77):
 
             next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
             next_state = torch.clamp(next_obs - obs, min=0)
-            encoded_state[80 - 3 - occlusionloc:80 - occlusionloc, :] = 0
             next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
             episode_rewards[i_episode] += reward
             episode_lengths[i_episode] = t
