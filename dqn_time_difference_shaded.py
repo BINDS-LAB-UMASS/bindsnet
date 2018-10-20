@@ -10,7 +10,7 @@ from collections import deque, namedtuple
 import itertools
 
 isConvNet = False
-network_file = 'dqn_grayscale_2relus_neurons.pt'
+network_file = 'dqn_time_difference_shaded.pt'
 
 
 class Net(nn.Module):
@@ -23,7 +23,7 @@ class Net(nn.Module):
 
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        x = self.fc2(x)
         return x
 
 
@@ -42,7 +42,7 @@ class ConvNet(nn.Module):
         return x
 
 replay_memory_size = 200000
-replay_memory_init_size = 50000
+replay_memory_init_size = 32
 epsilon_start = 1.0
 epsilon_end = 0.1
 epsilon_decay_steps = 200000
@@ -87,6 +87,7 @@ state = torch.stack([obs] * 4, dim=2)
 for i in range(replay_memory_init_size):
     action = np.random.choice(np.arange(total_actions))
     next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
+    reward = np.sign(reward)
     next_state = torch.clamp(next_obs - obs, min=0)
     next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
     replay_memory.append(Transition(state, action, reward, next_state, done))
@@ -147,6 +148,7 @@ for i_episode in range(num_episodes):
             action_probs = policy(q_values, epsilon)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
+            reward = np.sign(reward)
             next_state = torch.clamp(next_obs - obs, min=0)
             next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
             replay_memory.append(Transition(state, action, reward, next_state, done))
