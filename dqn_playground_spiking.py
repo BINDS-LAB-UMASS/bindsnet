@@ -23,7 +23,7 @@ parser.add_argument('--print_interval', type=int, default=None)
 parser.add_argument('--gpu', dest='gpu', action='store_true')
 parser.add_argument('--layer1scale', dest='layer1scale', type=float, default=5)
 parser.add_argument('--layer2scale', dest='layer2scale', type=float, default=1)
-# parser.add_argument('--occlusionloc', dest='occlusionloc', type=int, default=0)
+parser.add_argument('--occlusionloc', dest='occlusionloc', type=int, default=0)
 parser.set_defaults(plot=False, render=False, gpu=False)
 
 locals().update(vars(parser.parse_args()))
@@ -175,7 +175,7 @@ for i_episode in range(num_episodes):
         sys.stdout.flush()
         encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
         encoded_state = torch.sum(encoded_state, dim=2)
-        # encoded_state[80-3 - occlusionloc:80-occlusionloc, :] = 0
+        encoded_state[80-3 - occlusionloc:80-occlusionloc, :] = 0
         encoded_state = encoded_state.view([1, -1]).repeat(500, 1)
         # encoded_state = bernoulli(torch.sum(encoded_state, dim=2), runtime)
         inpts = {'X': encoded_state, 'B1': torch.ones(500, 1), 'B2': torch.ones(500, 1)}
@@ -232,4 +232,4 @@ for i_episode in range(num_episodes):
 endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
-np.savetxt('analysis/snn_param_search_'+str(layer1scale)+'x'+str(layer2scale)+'.txt', episode_rewards)
+np.savetxt('analysis/snn_robustness_'+str(occlusionloc)+'.txt', episode_rewards)
