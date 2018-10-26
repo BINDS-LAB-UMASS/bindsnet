@@ -10,7 +10,7 @@ g_pos = pos[0]
 g = 0
 
 for index, x in enumerate(pos):
-    particle = np.loadtxt("analysis/snn_param_search_"+str(x[0])+"x"+str(x[1])+".txt")
+    particle = np.loadtxt("analysis/snn_tgd_param_prob_"+str(x[0])+"x"+str(x[1])+"x.txt")
     perf = np.mean(particle)
     if best[index][2] < np.mean(perf):
         best[index] = [x[0], x[1], perf]
