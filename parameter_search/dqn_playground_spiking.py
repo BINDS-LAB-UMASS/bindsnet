@@ -14,17 +14,17 @@ import itertools
 import argparse
 import pickle
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--seed', type=int, default=0)
-parser.add_argument('--dt', type=float, default=1.0)
-parser.add_argument('--runtime', type=int, default=500)
-parser.add_argument('--render_interval', type=int, default=None)
-parser.add_argument('--plot_interval', type=int, default=None)
-parser.add_argument('--plot', dest='plot', action='store_true')
-parser.add_argument('--print_interval', type=int, default=None)
-parser.add_argument('--gpu', dest='gpu', action='store_true')
-parser.add_argument('--layer1scale', dest='layer1scale', type=float, default=5)
-parser.add_argument('--layer2scale', dest='layer2scale', type=float, default=1)
+parser = argparse.ArgumentParser(prefix_chars='@')
+parser.add_argument('@@seed', type=int, default=0)
+parser.add_argument('@@dt', type=float, default=1.0)
+parser.add_argument('@@runtime', type=int, default=500)
+parser.add_argument('@@render_interval', type=int, default=None)
+parser.add_argument('@@plot_interval', type=int, default=None)
+parser.add_argument('@@plot', dest='plot', action='store_true')
+parser.add_argument('@@print_interval', type=int, default=None)
+parser.add_argument('@@gpu', dest='gpu', action='store_true')
+parser.add_argument('@@layer1scale', dest='layer1scale', type=float, default=5)
+parser.add_argument('@@layer2scale', dest='layer2scale', type=float, default=1)
 parser.set_defaults(plot=False, render=False, gpu=False)
 
 locals().update(vars(parser.parse_args()))
