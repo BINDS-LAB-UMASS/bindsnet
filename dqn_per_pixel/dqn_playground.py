@@ -81,7 +81,7 @@ for i_episode in range(num_episodes):
         encoded_state = torch.sum(encoded_state, dim=2)
         # states.append(encoded_state)
         encoded_state = encoded_state.view([1, -1])
-        encoded_state[pixel] = 0
+        encoded_state[0, pixel] = 0
         q_values = network(encoded_state.view([1, -1]).cuda())[0]
         # epsilon = epsilons[min(total_t, epsilon_decay_steps - 1)]
         action_probs, _ = policy(q_values, epsilon)
