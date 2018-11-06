@@ -29,6 +29,11 @@ parser.set_defaults(plot=False, render=False, gpu=False)
 
 locals().update(vars(parser.parse_args()))
 
+torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+np.random.seed(seed)
+
+
 num_episodes = 100
 action_pop_size = 1
 hidden_neurons = 1000
