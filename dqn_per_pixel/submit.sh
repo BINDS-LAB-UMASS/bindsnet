@@ -13,5 +13,5 @@ pixel=${1:-0}
 
 echo $pixel
 
-python3 dqn_playground_spiking.py --pixel $pixel
+python3 dqn_playground.py --pixel $pixel
 exit
