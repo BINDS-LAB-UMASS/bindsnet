@@ -1,10 +1,12 @@
 import torch.nn as nn
 import torch.functional as F
 from gym import wrappers
-from bindsnet import *
 import itertools
 import argparse
 import numpy as np
+import sys
+sys.path.append('../')
+from bindsnet import *
 
 seed = 0
 
