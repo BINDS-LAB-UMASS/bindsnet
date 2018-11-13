@@ -8,7 +8,6 @@ import numpy as np
 import sys
 sys.path.append('../')
 from bindsnet import *
-from bindsnet import GymEnvironment
 
 seed = 0
 
