@@ -205,7 +205,7 @@ class LIFNodes(Nodes):
     Layer of leaky integrate-and-fire (LIF) neurons.
     '''
     def __init__(self, n=None, shape=None, traces=False, thresh=-52.0, rest=-65.0,
-                 reset=-65.0, refrac=5, decay=1e-2, trace_tc=5e-2, probabilistic=False):
+                 reset=-65.0, refrac=5, decay=1e-2, trace_tc=5e-2, probabilistic=False, beta=1):
         '''
         Instantiates a layer of LIF neurons.
 
@@ -229,6 +229,7 @@ class LIFNodes(Nodes):
         self.refrac = refrac   # Post-spike refractory period.
         self.decay = decay     # Rate of decay of neuron voltage.
         self.probabilistic = probabilistic
+        self.beta = beta
 
         self.v = self.rest * torch.ones(self.shape)  # Neuron voltages.
         self.refrac_count = torch.zeros(self.shape)  # Refractory period counters.
@@ -253,7 +254,7 @@ class LIFNodes(Nodes):
 
         # Check for spiking neurons.
         if self.probabilistic:
-            spikeprobs = torch.distributions.Bernoulli(torch.clamp((self.v - self.rest)/(self.thresh-self.rest), min=0, max=1))
+            spikeprobs = torch.distributions.Bernoulli(torch.clamp(torch.exp(self.beta * (self.v - self.thresh)), max=1))
             self.s = spikeprobs.sample()
             self.s = self.s.byte()
         else:
