@@ -40,9 +40,8 @@ hidden_neurons = 1000
 readout_neurons = 4 * action_pop_size
 epsilon = 0.0  # probability of picking random action
 accumulator = False
-probabilistic = True
+probabilistic = False
 noop_counter = 0
-new_life = True
 bias = False
 
 
@@ -74,7 +73,7 @@ else:
 
 # Build network.
 
-dqn_network = torch.load('../trained models/dqn_time_difference_grayscale.pt')
+dqn_network = torch.load('../trained models/dqn_binary.pt')
 
 network = Network(dt=dt, accumulator=accumulator)
 
@@ -179,7 +178,7 @@ for i_episode in range(num_episodes):
 
     for t in itertools.count():
         sys.stdout.flush()
-        encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
+        encoded_state = state.cuda()
         encoded_state = torch.sum(encoded_state, dim=2)
         encoded_state = encoded_state.view([1, -1]).repeat(500, 1)
         # encoded_state = bernoulli(torch.sum(encoded_state, dim=2), runtime)
@@ -195,14 +194,7 @@ for i_episode in range(num_episodes):
         if noop_counter >= 20:
             action = np.random.choice(np.arange(len(action_probs)))
             noop_counter = 0
-        if new_life:
-            action = 1
-
         next_obs, reward, done, info = environment.step(VALID_ACTIONS[action])
-        if prev_life - info["ale.lives"] != 0:
-            new_life = True
-        else:
-            new_life = False
 
         prev_life = info["ale.lives"]
         next_state = torch.clamp(next_obs - obs, min=0)
@@ -237,4 +229,4 @@ for i_episode in range(num_episodes):
 endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
-np.savetxt('analysis/snn_tgd_param_prob_'+str(layer1scale)+'x'+str(layer2scale)+'x.txt', episode_rewards)
+np.savetxt('analysis/snn_binary_param_'+str(layer1scale)+'x'+str(layer2scale)+'x.txt', episode_rewards)

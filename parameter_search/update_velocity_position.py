@@ -24,8 +24,6 @@ for index, x in enumerate(pos):
     for dim in range(2):
         new_vel[index][dim] = omega * vel[index][dim] + (np.random.random_sample() * c  * (best[index][dim] - x[dim])) + (np.random.random_sample() * c  * (g_pos[dim] - x[dim]))
         new_pos[index][dim] = x[dim] + new_vel[index][dim]
-        if new_pos[index][dim] < 0:
-            new_pos[index][dim] = 0.1
 
 np.savetxt("particle_pos.txt", new_pos)
 np.savetxt("particle_vel.txt", new_vel)
