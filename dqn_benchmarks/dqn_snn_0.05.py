@@ -40,8 +40,6 @@ readout_neurons = 4 * action_pop_size
 epsilon = 0.05  # probability of picking random action
 accumulator = False
 probabilistic = False
-noop_counter = 0
-new_life = True
 bias = False
 
 
@@ -187,21 +185,7 @@ for i_episode in range(num_episodes):
         # print(torch.sum(readout_spikes, dim=0))
         action_probs = policy(torch.sum(readout_spikes, dim=0), epsilon)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-        if action == 0:
-            noop_counter += 1
-        else:
-            noop_counter = 0
-        if noop_counter >= 20:
-            action = np.random.choice(np.arange(len(action_probs)))
-            noop_counter = 0
-        if new_life:
-            action = 1
-
         next_obs, reward, done, info = environment.step(VALID_ACTIONS[action])
-        if prev_life - info["ale.lives"] != 0:
-            new_life = True
-        else:
-            new_life = False
 
         prev_life = info["ale.lives"]
         next_state = torch.clamp(next_obs - obs, min=0)
