@@ -12,7 +12,7 @@ from time import time
 from collections import deque, namedtuple
 import itertools
 import argparse
-import pickle
+import pandas as pd
 
 parser = argparse.ArgumentParser(prefix_chars='@')
 parser.add_argument('@@seed', type=int, default=0)
@@ -25,6 +25,7 @@ parser.add_argument('@@print_interval', type=int, default=None)
 parser.add_argument('@@gpu', dest='gpu', action='store_true')
 parser.add_argument('@@layer1scale', dest='layer1scale', type=float, default=6.45)
 parser.add_argument('@@layer2scale', dest='layer2scale', type=float, default=71.15)
+parser.add_argument('@@num_episodes', type=int, default=100)
 parser.set_defaults(plot=False, render=False, gpu=False)
 
 locals().update(vars(parser.parse_args()))
@@ -32,8 +33,6 @@ torch.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 np.random.seed(seed)
 
-
-num_episodes = 100
 action_pop_size = 1
 hidden_neurons = 1000
 readout_neurons = 4 * action_pop_size
@@ -217,4 +216,26 @@ for i_episode in range(num_episodes):
 endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
-np.savetxt('analysis/snn_benchmark_'+str(layer1scale)+'x'+str(layer2scale)+'x_0.05.txt', episode_rewards)
+
+columns = [
+        'seed', 'time', 'n_snn_episodes', 'epsilon', 'avg. reward', 'std. reward'
+    ]
+data = [[
+    seed, runtime, num_episodes, epsilon, np.mean(episode_rewards), np.std(episode_rewards)
+]]
+
+model_name = '_'.join([str(x) for x in [seed, runtime, num_episodes, epsilon]])
+
+path = os.path.join('results.csv')
+if not os.path.isfile(path):
+    df = pd.DataFrame(data=data, index=[model_name], columns=columns)
+else:
+    df = pd.read_csv(path, index_col=0)
+
+    if model_name not in df.index:
+        df = df.append(pd.DataFrame(data=data, index=[model_name], columns=columns))
+    else:
+        df.loc[model_name] = data[0]
+
+df.to_csv(path, index=True)
+
