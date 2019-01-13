@@ -218,13 +218,13 @@ endTime = time()
 print("\nTotal time taken:", endTime - startTime)
 
 columns = [
-        'seed', 'time', 'n_snn_episodes', 'epsilon', 'avg. reward', 'std. reward'
+        'seed', 'time', 'n_snn_episodes', 'epsilon', 'probabilistic', 'avg. reward', 'std. reward'
     ]
 data = [[
-    seed, runtime, num_episodes, epsilon, np.mean(episode_rewards), np.std(episode_rewards)
+    seed, runtime, num_episodes, epsilon, probabilistic, np.mean(episode_rewards), np.std(episode_rewards)
 ]]
 
-model_name = '_'.join([str(x) for x in [seed, runtime, num_episodes, epsilon]])
+model_name = '_'.join([str(x) for x in [seed, runtime, num_episodes, epsilon, probabilistic]])
 
 path = os.path.join('results.csv')
 if not os.path.isfile(path):
