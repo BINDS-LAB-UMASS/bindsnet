@@ -72,7 +72,7 @@ else:
 
 dqn_network = torch.load('../trained models/dqn_time_difference_grayscale.pt')
 
-network = Net(dt=dt, accumulator=accumulator)
+network = Network(dt=dt, accumulator=accumulator)
 
 # Layers of neurons.
 inpt = Input(n=6400, traces=False)  # Input layer
