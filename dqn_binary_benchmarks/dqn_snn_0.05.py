@@ -75,7 +75,7 @@ dqn_network = torch.load('../trained models/dqn_binary.pt')
 network = Network(dt=dt, accumulator=accumulator)
 
 # Layers of neurons.
-inpt = Input(n=6400, traces=False)  # Input layer
+inpt = Input(n=6400, shape=[80, 80], traces=False)  # Input layer
 bias1 = Input(n=1, traces=False)  # bias 1
 # exc = AdaptiveLIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2, theta_plus=0.05, theta_decay=1e-7, probabilistic=probabilistic)  # Excitatory layer
 exc = LIFNodes(n=hidden_neurons, refrac=0, traces=True, thresh=-52, rest=-65.0, decay=1e-2,
@@ -94,7 +94,7 @@ else:
 # Connections between layers.
 # Input -> excitatory.
 input_exc_conn = Connection(source=layers['X'], target=layers['E'],
-                            w=torch.transpose(dqn_network.fc1.weight, 0, 1) * layer1scale)
+                            w=torch.transpose(dqn_network.fc1.weight, 0, 1).view([80, 80, 1000]) * layer1scale)
 if bias:
     bias1_exc_conn = Connection(source=layers['B1'], target=layers['E'], w=dqn_network.fc1.bias.unsqueeze(0) * 10)
 
@@ -176,6 +176,7 @@ for i_episode in range(num_episodes):
     for t in itertools.count():
         sys.stdout.flush()
         encoded_state = bernoulli(torch.sum(state, dim=2), runtime)
+        print(encoded_state.shape)
         inpts = {'X': encoded_state}
         hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
         # print(torch.sum(readout_spikes, dim=0))
