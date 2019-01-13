@@ -7,5 +7,6 @@ do
     for num_episodes in 1
     do
         sbatch submit_snn.sh $seed $num_episodes
+        sbatch submit_snn_probabilistic.sh $seed $num_episodes
     done
 done

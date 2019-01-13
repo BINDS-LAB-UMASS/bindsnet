@@ -21,12 +21,13 @@ parser.add_argument('@@runtime', type=int, default=500)
 parser.add_argument('@@render_interval', type=int, default=None)
 parser.add_argument('@@plot_interval', type=int, default=None)
 parser.add_argument('@@plot', dest='plot', action='store_true')
+parser.add_argument('@@probabilistic', dest='probabilistic', action='store_true')
 parser.add_argument('@@print_interval', type=int, default=None)
 parser.add_argument('@@gpu', dest='gpu', action='store_true')
 parser.add_argument('@@layer1scale', dest='layer1scale', type=float, default=6.45)
 parser.add_argument('@@layer2scale', dest='layer2scale', type=float, default=71.15)
 parser.add_argument('@@num_episodes', type=int, default=100)
-parser.set_defaults(plot=False, render=False, gpu=False)
+parser.set_defaults(plot=False, render=False, gpu=False, probabilistic=False)
 
 locals().update(vars(parser.parse_args()))
 torch.manual_seed(seed)
@@ -38,7 +39,6 @@ hidden_neurons = 1000
 readout_neurons = 4 * action_pop_size
 epsilon = 0.05  # probability of picking random action
 accumulator = False
-probabilistic = False
 bias = False
 
 
