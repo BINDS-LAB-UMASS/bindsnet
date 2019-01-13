@@ -97,5 +97,5 @@ for i_episode in range(num_episodes):
         state = next_state
         obs = next_obs
 
-np.savetxt('analysis/dqn_benchmark_0.05.txt', episode_rewards)
+np.savetxt('dqn_benchmark_0.05.txt', episode_rewards)
 
