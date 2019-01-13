@@ -9,11 +9,10 @@
 #SBATCH -e res_%j.err
 #SBATCH --gres=gpu:1
 
-layer1scale=${1:-5}
-layer2scale=${2:-1}
-occlusionloc=${3:0}
+seed=${1:-5}
+occlusionloc=${2:-0}
 
-echo $layer1scale $layer2scale $occlusionloc
+echo $seed $occlusionloc
 
-python3 dqn_playground_spiking.py --layer1scale $layer1scale --layer2scale $layer2scale --occlusionloc $occlusionloc
+python3 dqn_snn_0.05.py @@seed $seed @@occlusionloc $occlusionloc
 exit

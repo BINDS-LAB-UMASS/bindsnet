@@ -13,5 +13,5 @@ occlusionloc=${1:-0}
 
 echo $occlusionloc
 
-python3 dqn_playground.py --occlusionloc $occlusionloc
+python3 dqn_ann_0.05.py --occlusionloc $occlusionloc
 exit
