@@ -219,25 +219,8 @@ endTime = time()
 
 print("\nTotal time taken:", endTime - startTime)
 
-columns = [
-        'seed', 'time', 'n_snn_episodes', 'epsilon', 'probabilistic','occlusionloc', 'avg. reward', 'std. reward'
-    ]
-data = [[
-    seed, runtime, num_episodes, epsilon, probabilistic, occlusionloc, np.mean(episode_rewards), np.std(episode_rewards)
-]]
 
 model_name = '_'.join([str(x) for x in [seed, runtime, num_episodes, epsilon, probabilistic, occlusionloc]])
 
-path = os.path.join('results.csv')
-if not os.path.isfile(path):
-    df = pd.DataFrame(data=data, index=[model_name], columns=columns)
-else:
-    df = pd.read_csv(path, index_col=0)
-
-    if model_name not in df.index:
-        df = df.append(pd.DataFrame(data=data, index=[model_name], columns=columns))
-    else:
-        df.loc[model_name] = data[0]
-
-df.to_csv(path, index=True)
+np.savetxt('snn_analysis/' +model_name+ '.txt', episode_rewards)
 
