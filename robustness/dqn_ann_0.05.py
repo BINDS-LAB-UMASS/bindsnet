@@ -21,6 +21,8 @@ locals().update(vars(parser.parse_args()))
 
 num_episodes = 100
 epsilon = 0.05
+noop_counter = 0
+
 
 
 class Net(nn.Module):
@@ -72,6 +74,7 @@ def policy(q_values, eps):
 for i_episode in range(num_episodes):
     obs = environment.reset()
     state = torch.stack([obs] * 4, dim=2)
+    prev_life = 5
 
     for t in itertools.count():
         print("\rStep {} ({}) @ Episode {}/{}".format(
@@ -84,7 +87,15 @@ for i_episode in range(num_episodes):
         q_values = network(encoded_state.view([1, -1]).cuda())[0]
         action_probs, _ = policy(q_values, epsilon)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-        next_obs, reward, done, _ = environment.step(VALID_ACTIONS[action])
+        if action == 0:
+            noop_counter += 1
+        else:
+            noop_counter = 0
+        if noop_counter >= 20:
+            action = np.random.choice(np.arange(len(action_probs)))
+            noop_counter = 0
+        next_obs, reward, done, info = environment.step(VALID_ACTIONS[action])
+        prev_life = info["ale.lives"]
         next_state = torch.clamp(next_obs - obs, min=0)
         next_state = torch.cat((state[:, :, 1:], next_state.view([next_state.shape[0], next_state.shape[1], 1])), dim=2)
         episode_rewards[i_episode] += reward
