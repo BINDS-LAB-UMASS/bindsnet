@@ -37,9 +37,10 @@ np.random.seed(seed)
 action_pop_size = 1
 hidden_neurons = 1000
 readout_neurons = 4 * action_pop_size
-epsilon = 0.05  # probability of picking random action
+epsilon = 0.0  # probability of picking random action
 accumulator = False
 bias = False
+noop_counter = 0
 
 
 class Net(nn.Module):
@@ -184,6 +185,14 @@ for i_episode in range(num_episodes):
         # print(torch.sum(readout_spikes, dim=0))
         action_probs = policy(torch.sum(readout_spikes, dim=0), epsilon)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+
+        if action == 0:
+            noop_counter += 1
+        else:
+            noop_counter = 0
+        if noop_counter >= 20:
+            action = np.random.choice(np.arange(len(action_probs)))
+            noop_counter = 0
         next_obs, reward, done, info = environment.step(VALID_ACTIONS[action])
 
         prev_life = info["ale.lives"]
