@@ -26,7 +26,7 @@ parser.add_argument('@@print_interval', type=int, default=None)
 parser.add_argument('@@gpu', dest='gpu', action='store_true')
 parser.add_argument('@@layer1scale', dest='layer1scale', type=float, default=6.45)
 parser.add_argument('@@layer2scale', dest='layer2scale', type=float, default=71.15)
-parser.add_argument('@@num_episodes', type=int, default=1)
+parser.add_argument('@@num_episodes', type=int, default=100)
 parser.add_argument('@@occlusion', dest='occlusion', type=int, default=0)
 parser.set_defaults(plot=False, render=False, gpu=False, probabilistic=False)
 
