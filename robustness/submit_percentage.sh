@@ -13,5 +13,5 @@ occlusion=${1:-0}
 
 echo $occlusion
 
-python3 dqn_snn_percentage_0.05.py @@occlusionloc $occlusion
+python3 dqn_snn_percentage_0.05.py @@occlusion $occlusion
 exit
