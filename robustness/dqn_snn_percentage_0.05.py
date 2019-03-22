@@ -184,9 +184,9 @@ for i_episode in range(num_episodes):
         encoded_state = torch.tensor([0.25, 0.5, 0.75, 1]) * state.cuda()
         encoded_state = torch.sum(encoded_state, dim=2)
         encoded_state[np.where(indices)] = 0
-        encoded_state = encoded_state.view([1, -1]).repeat(500, 1)
+        encoded_state = encoded_state.view([1, -1]).repeat(runtime, 1)
         # encoded_state = bernoulli(torch.sum(encoded_state, dim=2), runtime)
-        inpts = {'X': encoded_state, 'B1': torch.ones(500, 1), 'B2': torch.ones(500, 1)}
+        inpts = {'X': encoded_state, 'B1': torch.ones(runtime, 1), 'B2': torch.ones(runtime, 1)}
         hidden_spikes, readout_spikes = network.run(inpts=inpts, time=runtime)
         # print(torch.sum(readout_spikes, dim=0))
         action_probs = policy(torch.sum(readout_spikes, dim=0), epsilon)

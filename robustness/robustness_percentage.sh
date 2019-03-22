@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-for occlusion in {0..100..5}
+for runtime in 125 250
 do
-    sbatch submit_percentage.sh $occlusion
+    for occlusion in {0..100..5}
+    do
+        sbatch submit_percentage.sh $occlusion $runtime
+    done
 done

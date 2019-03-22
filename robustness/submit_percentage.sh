@@ -10,8 +10,9 @@
 #SBATCH --gres=gpu:1
 
 occlusion=${1:-0}
+runtime=${2:-500}
 
-echo $occlusion
+echo $occlusion $runtime
 
-python3 dqn_snn_percentage_0.05.py @@occlusion $occlusion
+python3 dqn_snn_percentage_0.05.py @@occlusion $occlusion @@runtime $runtime
 exit
