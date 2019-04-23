@@ -1,12 +1,10 @@
-import tempfile
-from typing import Dict, Optional
-
 import torch
+import tempfile
+from typing import Dict
 
-from .monitors import AbstractMonitor
 from .nodes import AbstractInput, Nodes
 from .topology import AbstractConnection
-from ..learning.reward import AbstractReward
+from .monitors import AbstractMonitor
 
 __all__ = [
     'load', 'Network', 'nodes', 'monitors', 'topology'
@@ -32,6 +30,7 @@ def load(file_name: str, map_location: str = 'cpu', learning: bool = None) -> 'N
 class Network:
     # language=rst
     """
+
     Most important object of the :code:`bindsnet` package. Responsible for the simulation and interaction of nodes and
     connections.
 
@@ -63,7 +62,7 @@ class Network:
         network.add_monitor(monitor=M2, name='Y')
 
         # Create Poisson-distributed spike train inputs.
-        data = 15 * torch.rand(100)  # Generate random Poisson rates for 100 input neurons.
+        data = 15 * torch.rand(1, 100)  # Generate random Poisson rates for 100 input neurons.
         train = encoding.poisson(datum=data, time=5000)  # Encode input as 5000ms Poisson spike trains.
 
         # Simulate network on generated spike trains.
@@ -84,25 +83,19 @@ class Network:
         plt.tight_layout(); plt.show()
     """
 
-    def __init__(self, dt: float = 1.0, learning: bool = True,
-                 reward_fn: Optional[AbstractReward] = None) -> None:
+    def __init__(self, dt: float = 1.0, learning: bool = True) -> None:
         # language=rst
         """
         Initializes network object.
 
         :param dt: Simulation timestep.
         :param learning: Whether to allow connection updates. True by default.
-        :param reward_fn: Optional class allowing for modification of reward in case of reward-modulated learning.
         """
         self.dt = dt
         self.layers = {}
         self.connections = {}
         self.monitors = {}
         self.learning = learning
-        if reward_fn is not None:
-            self.reward_fn = reward_fn()
-        else:
-            self.reward_fn = None
 
     def add_layer(self, layer: Nodes, name: str) -> None:
         # language=rst
@@ -115,7 +108,6 @@ class Network:
         self.layers[name] = layer
         layer.network = self
         layer.dt = self.dt
-        layer._compute_decays()
 
     def add_connection(self, connection: AbstractConnection, source: str, target: str) -> None:
         # language=rst
@@ -181,8 +173,6 @@ class Network:
         # language=rst
         """
         Returns a cloned network object.
-        
-        :return: A copy of this network.
         """
         virtual_file = tempfile.SpooledTemporaryFile()
         torch.save(self, virtual_file)
@@ -215,7 +205,7 @@ class Network:
     def run(self, inpts: Dict[str, torch.Tensor], time: int, **kwargs) -> None:
         # language=rst
         """
-        Simulate network for given inputs and time.
+        Simulation network for given inputs and time.
 
         :param inpts: Dictionary of ``Tensor``s of shape ``[time, n_input]``.
         :param time: Simulation time.
@@ -228,7 +218,7 @@ class Network:
                                                 to not spiking. The ``Tensor``s should have shape ``[n_neurons]``.
         :param Dict[str, torch.Tensor] injects_v: Mapping of layer names to boolean masks if neurons should be added
                                                   voltage. The ``Tensor``s should have shape ``[n_neurons]``.
-        :param Union[float, torch.Tensor] reward: Scalar value used in reward-modulated learning.
+        :param float reward: Scalar value used in reward-modulated learning.
         :param Dict[Tuple[str], torch.Tensor] masks: Mapping of connection names to boolean masks determining which
                                                      weights to clamp to zero.
 
@@ -267,10 +257,6 @@ class Network:
         unclamps = kwargs.get('unclamp', {})
         masks = kwargs.get('masks', {})
         injects_v = kwargs.get('injects_v', {})
-
-        # Compute reward.
-        if self.reward_fn is not None:
-            kwargs['reward'] = self.reward_fn.compute(**kwargs)
 
         # Effective number of timesteps.
         timesteps = int(time / self.dt)

@@ -68,7 +68,7 @@ class Pipeline:
         self.v_ims, self.v_axes = None, None
         self.obs_im, self.obs_ax = None, None
         self.reward_im, self.reward_ax = None, None
-        self.accumulated_reward = 0.0
+        self.accumulated_reward = 0
         self.reward_list = []
 
         # Setting kwargs.
@@ -115,7 +115,6 @@ class Pipeline:
             name: torch.Tensor() for name, layer in network.layers.items() if isinstance(layer, AbstractInput)
         }
 
-        self.action = None
         self.obs = None
         self.reward = None
         self.done = None
@@ -156,12 +155,14 @@ class Pipeline:
 
         # Choose action based on output neuron spiking.
         if self.action_function is not None:
-            self.action = self.action_function(self, output=self.output)
+            a = self.action_function(self, output=self.output)
+        else:
+            a = None
 
         # Run a step of the environment.
-        self.obs, reward, self.done, info = self.env.step(self.action)
+        self.obs, reward, self.done, info = self.env.step(a)
 
-        # Set reward in case of delay.
+        # Set reward in case of delay
         if self.reward_delay is not None:
             self.rewards = torch.tensor([reward, *self.rewards[1:]]).float()
             self.reward = self.rewards[-1]
@@ -193,12 +194,10 @@ class Pipeline:
         self.iteration += 1
 
         if self.done:
-            if self.network.reward_fn is not None:
-                self.network.reward_fn.update(**kwargs)
             self.iteration = 0
             self.episode += 1
             self.reward_list.append(self.accumulated_reward)
-            self.accumulated_reward = 0.0
+            self.accumulated_reward = 0
             self.plot_reward()
 
     def plot_obs(self) -> None:
@@ -332,5 +331,5 @@ class Pipeline:
         self.env.reset()
         self.network.reset_()
         self.iteration = 0
-        self.accumulated_reward = 0.0
+        self.accumulated_reward = 0
         self.history = {i: torch.Tensor() for i in self.history}
