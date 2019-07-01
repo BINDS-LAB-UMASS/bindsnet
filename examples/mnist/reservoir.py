@@ -17,8 +17,6 @@ from bindsnet.datasets import MNIST
 from bindsnet.encoding import PoissonEncoder
 from bindsnet.network import Network
 from bindsnet.network.nodes import Input
-
-# Build a simple two-layer, input-output network.
 from bindsnet.network.monitors import Monitor
 from bindsnet.network.nodes import LIFNodes
 from bindsnet.network.topology import Connection
@@ -45,14 +43,11 @@ seed = args.seed
 n_neurons = args.n_neurons
 n_epochs = args.n_epochs
 n_workers = args.n_workers
-exc = args.exc
-inh = args.inh
 time = args.time
 dt = args.dt
 intensity = args.intensity
 progress_interval = args.progress_interval
 update_interval = args.update_interval
-train = args.train
 plot = args.plot
 gpu = args.gpu
 
@@ -64,7 +59,7 @@ else:
 
 
 network = Network(dt=dt)
-inpt = Input(784, shape=(1, 1, 28, 28))
+inpt = Input(784, shape=(1, 28, 28))
 network.add_layer(inpt, name="I")
 output = LIFNodes(n_neurons, thresh=-52 + torch.randn(n_neurons))
 network.add_layer(output, name="O")
@@ -120,6 +115,7 @@ i = 0
 for (step, dataPoint) in pbar:
     datum = dataPoint["encoded_image"]
     label = dataPoint["label"]
+
     pbar.set_description("Train progress: (%d / %d)" % (i, n_iters))
 
     network.run(inpts={"I": datum}, time=time, input_time_dim=1)
@@ -133,12 +129,12 @@ for (step, dataPoint) in pbar:
         ims=inpt_ims,
     )
     spike_ims, spike_axes = plot_spikes(
-        {layer: spikes[layer].get("s").view(-1, time) for layer in spikes},
+        {layer: spikes[layer].get("s").view(time, -1) for layer in spikes},
         axes=spike_axes,
         ims=spike_ims,
     )
     voltage_ims, voltage_axes = plot_voltages(
-        {layer: voltages[layer].get("v").view(-1, time) for layer in voltages},
+        {layer: voltages[layer].get("v").view(time, -1) for layer in voltages},
         ims=voltage_ims,
         axes=voltage_axes,
     )
@@ -150,7 +146,7 @@ for (step, dataPoint) in pbar:
     plt.pause(1e-8)
     network.reset_()
 
-    if i > n_iters:
+    if step > n_iters:
         break
 
     i += 1
@@ -210,12 +206,12 @@ for (step, dataPoint) in pbar:
         ims=inpt_ims,
     )
     spike_ims, spike_axes = plot_spikes(
-        {layer: spikes[layer].get("s").view(-1, 250) for layer in spikes},
+        {layer: spikes[layer].get("s").view(time, -1) for layer in spikes},
         axes=spike_axes,
         ims=spike_ims,
     )
     voltage_ims, voltage_axes = plot_voltages(
-        {layer: voltages[layer].get("v").view(-1, 250) for layer in voltages},
+        {layer: voltages[layer].get("v").view(time, -1) for layer in voltages},
         ims=voltage_ims,
         axes=voltage_axes,
     )
@@ -229,6 +225,7 @@ for (step, dataPoint) in pbar:
 
     if i > n_iters:
         break
+
     i += 1
 
 # Test the Model
