@@ -1,5 +1,6 @@
 import time
 from typing import Tuple, Dict, Any
+import sys
 
 import torch
 from torch._six import container_abcs, string_classes
@@ -68,7 +69,9 @@ class BasePipeline:
             "plot_config", {"data_step": None, "data_length": 10}
         )
 
-        if self.plot_config["data_step"] is not None:
+        # Only construct monitors if there is data requested to be
+        # plotted
+        if self.plot_config["data_length"] is not None:
             for l in self.network.layers:
                 self.network.add_monitor(
                     Monitor(
@@ -83,6 +86,8 @@ class BasePipeline:
                         ),
                         name=f"{l}_voltages",
                     )
+
+        self.plot_interval = self.plot_config["data_step"]
 
         self.print_interval = kwargs.get("print_interval", None)
 
@@ -138,8 +143,8 @@ class BasePipeline:
             )
             self.clock = time.time()
 
-        # if self.plot_interval is not None and self.step_count % self.plot_interval == 0:
-        self.plots(batch, step_out)
+        if self.plot_interval is not None and self.step_count % self.plot_interval == 0:
+            self.plots(batch, step_out)
 
         if self.save_interval is not None and self.step_count % self.save_interval == 0:
             self.network.save(self.save_dir)
@@ -224,3 +229,7 @@ class BasePipeline:
         :param step_out: The output from the ``step_()`` method.
         """
         raise NotImplementedError("You need to provide a plots method.")
+
+    def exit(self):
+        self.network.save(self.save_dir)
+        sys.exit()
