@@ -27,7 +27,7 @@ class Monitor(AbstractMonitor):
         obj: Union[Nodes, AbstractConnection],
         state_vars: Iterable[str],
         time: Optional[int] = None,
-        batch_size: int = 1,
+        detach: bool = True,
     ):
         # language=rst
         """
@@ -42,7 +42,7 @@ class Monitor(AbstractMonitor):
         self.obj = obj
         self.state_vars = state_vars
         self.time = time
-        self.batch_size = batch_size
+        self.detach = detach
 
         # Deal with time later, the same underlying list is used
         self.recording = {v: [] for v in self.state_vars}

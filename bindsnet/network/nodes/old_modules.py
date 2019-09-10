@@ -13,16 +13,7 @@ class Nodes(torch.nn.Module):
     """
 
     def __init__(
-        self,
-        n: Optional[int] = None,
-        shape: Optional[Iterable[int]] = None,
-        traces: bool = False,
-        traces_additive: bool = False,
-        tc_trace: Union[float, torch.Tensor] = 20.0,
-        trace_scale: Union[float, torch.Tensor] = 1.0,
-        sum_input: bool = False,
-        learning: bool = True,
-        **kwargs,
+        self, n: Optional[int] = None, shape: Optional[Iterable[int]] = None, **kwargs
     ) -> None:
         # language=rst
         """
@@ -30,12 +21,6 @@ class Nodes(torch.nn.Module):
 
         :param n: The number of neurons in the layer.
         :param shape: The dimensionality of the layer.
-        :param traces: Whether to record decaying spike traces.
-        :param traces_additive: Whether to record spike traces additively.
-        :param tc_trace: Time constant of spike trace decay.
-        :param trace_scale: Scaling factor for spike trace.
-        :param sum_input: Whether to sum all inputs.
-        :param learning: Whether to be in learning or testing.
         """
         super().__init__()
 
@@ -57,32 +42,7 @@ class Nodes(torch.nn.Module):
             mul, self.shape
         ), "No. of neurons and shape do not match"
 
-        self.traces = traces  # Whether to record synaptic traces.
-        self.traces_additive = (
-            traces_additive
-        )  # Whether to record spike traces additively.
-        self.register_buffer("s", torch.ByteTensor())  # Spike occurrences.
-
-        self.sum_input = sum_input  # Whether to sum all inputs.
-
-        if self.traces:
-            self.register_buffer("x", torch.Tensor())  # Firing traces.
-            self.register_buffer(
-                "tc_trace", torch.tensor(tc_trace)
-            )  # Time constant of spike trace decay.
-            if self.traces_additive:
-                self.register_buffer(
-                    "trace_scale", torch.tensor(trace_scale)
-                )  # Scaling factor for spike trace.
-            self.register_buffer(
-                "trace_decay", torch.empty_like(self.tc_trace)
-            )  # Set in compute_decays.
-
-        if self.sum_input:
-            self.register_buffer("summed", torch.FloatTensor())  # Summed inputs.
-
         self.dt = None
-        self.learning = learning
 
     @abstractmethod
     def forward(self, x: torch.Tensor) -> None:
@@ -111,12 +71,6 @@ class Nodes(torch.nn.Module):
         Abstract base class method for resetting state variables.
         """
         self.s.zero_()
-
-        if self.traces:
-            self.x.zero_()  # Spike traces.
-
-        if self.sum_input:
-            self.summed.zero_()  # Summed inputs.
 
     def compute_decays(self, dt) -> None:
         # language=rst
@@ -157,131 +111,6 @@ class Nodes(torch.nn.Module):
         """
         self.learning = mode
         return super().train(mode)
-
-
-class AbstractInput(ABC):
-    # language=rst
-    """
-    Abstract base class for groups of input neurons.
-    """
-
-
-class Input(Nodes, AbstractInput):
-    # language=rst
-    """
-    Layer of nodes with user-specified spiking behavior.
-    """
-
-    def __init__(
-        self,
-        n: Optional[int] = None,
-        shape: Optional[Iterable[int]] = None,
-        traces: bool = False,
-        traces_additive: bool = False,
-        tc_trace: Union[float, torch.Tensor] = 20.0,
-        trace_scale: Union[float, torch.Tensor] = 1.0,
-        sum_input: bool = False,
-        **kwargs,
-    ) -> None:
-        # language=rst
-        """
-        Instantiates a layer of input neurons.
-
-        :param n: The number of neurons in the layer.
-        :param shape: The dimensionality of the layer.
-        :param traces: Whether to record decaying spike traces.
-        :param traces_additive: Whether to record spike traces additively.
-        :param tc_trace: Time constant of spike trace decay.
-        :param trace_scale: Scaling factor for spike trace.
-        :param sum_input: Whether to sum all inputs.
-        """
-        super().__init__(
-            n=n,
-            shape=shape,
-            traces=traces,
-            traces_additive=traces_additive,
-            tc_trace=tc_trace,
-            trace_scale=trace_scale,
-            sum_input=sum_input,
-        )
-
-    def forward(self, x: torch.Tensor) -> None:
-        # language=rst
-        """
-        On each simulation step, set the spikes of the population equal to the inputs.
-
-        :param x: Inputs to the layer.
-        """
-        # Set spike occurrences to input values.
-        self.s = x.byte()
-
-        super().forward(x)
-
-    def reset_(self) -> None:
-        # language=rst
-        """
-        Resets relevant state variables.
-        """
-        super().reset_()
-
-
-class RealInput(Nodes, AbstractInput):
-    # language=rst
-    """
-    Layer of nodes with user-specified real-valued outputs.
-    """
-
-    def __init__(
-        self,
-        n: Optional[int] = None,
-        shape: Optional[Iterable[int]] = None,
-        traces: bool = False,
-        traces_additive: bool = False,
-        tc_trace: Union[float, torch.Tensor] = 20.0,
-        trace_scale: Union[float, torch.Tensor] = 1.0,
-        sum_input: bool = False,
-        **kwargs,
-    ) -> None:
-        # language=rst
-        """
-        Instantiates a layer of input neurons.
-
-        :param n: The number of neurons in the layer.
-        :param shape: The dimensionality of the layer.
-        :param traces: Whether to record decaying spike traces.
-        :param traces_additive: Whether to record spike traces additively.
-        :param tc_trace: Time constant of spike trace decay.
-        :param trace_scale: Scaling factor for spike trace.
-        :param sum_input: Whether to sum all inputs.
-        """
-        super().__init__(
-            n=n,
-            shape=shape,
-            traces=traces,
-            traces_additive=traces_additive,
-            tc_trace=tc_trace,
-            trace_scale=trace_scale,
-            sum_input=sum_input,
-        )
-
-    def forward(self, x: torch.Tensor) -> None:
-        # language=rst
-        """
-        On each simulation step, set the outputs of the population equal to the inputs.
-
-        :param x: Inputs to the layer.
-        """
-        # Set spike occurrences to input values.
-        self.s = self.dt * x
-
-        super().forward(x)
-
-    def reset_(self) -> None:
-        # language=rst
-        """
-        Resets relevant state variables.
-        """
-        super().reset_()
 
 
 class McCullochPitts(Nodes):

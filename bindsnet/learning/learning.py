@@ -4,7 +4,6 @@ from typing import Union, Optional, Sequence
 import torch
 import numpy as np
 
-from ..network.nodes import SRM0Nodes
 from ..network.topology import (
     AbstractConnection,
     Connection,
@@ -841,6 +840,8 @@ class Rmax(LearningRule):
         ), "Pre-synaptic nodes should keep track of their firing trace in an additive way."
 
         # Derivation of R-max depends on stochastic SRM neurons!
+        from ..network.nodes import SRM0Nodes
+
         assert isinstance(
             self.target, SRM0Nodes
         ), "R-max needs stochastically firing neurons, use SRM0Nodes."

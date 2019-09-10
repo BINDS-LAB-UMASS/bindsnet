@@ -1,5 +1,6 @@
 import tempfile
 from typing import Dict, Optional, Type, Iterable
+from collections import OrderedDict, defaultdict
 
 import torch
 
@@ -100,9 +101,10 @@ class Network(torch.nn.Module):
         self.dt = dt
         self.batch_size = batch_size
 
-        self.layers = {}
-        self.connections = {}
-        self.monitors = {}
+        self.layers = OrderedDict()
+        self.connections = OrderedDict()
+        self.monitors = OrderedDict()
+
         self.train(learning)
 
         if reward_fn is not None:
@@ -121,9 +123,7 @@ class Network(torch.nn.Module):
         self.layers[name] = layer
         self.add_module(name, layer)
 
-        layer.train(self.learning)
-        layer.compute_decays(self.dt)
-        layer.set_batch_size(self.batch_size)
+        layer.train(self.training)
 
     def add_connection(
         self, connection: AbstractConnection, source: str, target: str
@@ -140,7 +140,7 @@ class Network(torch.nn.Module):
         self.add_module(source + "_to_" + target, connection)
 
         connection.dt = self.dt
-        connection.train(self.learning)
+        connection.train(self.training)
 
     def add_monitor(self, monitor: AbstractMonitor, name: str) -> None:
         # language=rst
@@ -297,6 +297,8 @@ class Network(torch.nn.Module):
         masks = kwargs.get("masks", {})
         injects_v = kwargs.get("injects_v", {})
 
+        self.set_shapes(None)
+
         # Compute reward.
         if self.reward_fn is not None:
             kwargs["reward"] = self.reward_fn.compute(**kwargs)
@@ -319,9 +321,6 @@ class Network(torch.nn.Module):
                 # batch dimension is 1, grab this and use for batch size
                 if inpts[key].size(1) != self.batch_size:
                     self.batch_size = inpts[key].size(1)
-
-                    for l in self.layers:
-                        self.layers[l].set_batch_size(self.batch_size)
 
                     for m in self.monitors:
                         self.monitors[m].reset_()
@@ -376,7 +375,7 @@ class Network(torch.nn.Module):
             # Run synapse updates.
             for c in self.connections:
                 self.connections[c].update(
-                    mask=masks.get(c, None), learning=self.learning, **kwargs
+                    mask=masks.get(c, None), learning=self.training, **kwargs
                 )
 
             # Get input to all layers.
@@ -404,13 +403,15 @@ class Network(torch.nn.Module):
         for monitor in self.monitors:
             self.monitors[monitor].reset_()
 
-    def train(self, mode: bool = True) -> "torch.nn.Module":
-        # language=rst
-        """Sets the node in training mode.
+    def check_valid_shape_prop(self, start_node: str) -> bool:
+        return
 
-        :param mode: Turn training on or off.
+    def compute_shapes(
+        self, input_shapes: Dict[str, Iterable[int]]
+    ) -> Dict[str, Iterable[int]]:
+        return
 
-        :return: ``self`` as specified in ``torch.nn.Module``.
-        """
-        self.learning = mode
-        return super().train(mode)
+    def set_shapes(self, network_shapes):
+        for layer in self.layers.values():
+            layer.reset_(layer.shape)
+            layer.set_dt(self.dt)

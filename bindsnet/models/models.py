@@ -7,7 +7,7 @@ from torch.nn.modules.utils import _pair
 
 from ..learning import PostPre
 from ..network import Network
-from ..network.nodes import Input, RealInput, LIFNodes, DiehlAndCookNodes
+from ..network.nodes import Input, RealInput  # , LIFNodes, DiehlAndCookNodes
 from ..network.topology import Connection, LocalConnection
 
 
