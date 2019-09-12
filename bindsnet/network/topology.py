@@ -1,242 +1,70 @@
 from abc import ABC, abstractmethod
-from typing import Union, Tuple, Optional, Sequence
+from typing import Union, Tuple, Optional, Sequence, Iterable
 
 import numpy as np
 import torch
-from torch.nn import Module, Parameter
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.utils import _pair
 
 from .nodes import Nodes
 
 
-class AbstractConnection(ABC, Module):
+class AbstractConnection(ABC):
     # language=rst
     """
     Abstract base method for connections between ``Nodes``.
     """
 
-    def __init__(
-        self,
-        source: Nodes,
-        target: Nodes,
-        nu: Optional[Union[float, Sequence[float]]] = None,
-        reduction: Optional[callable] = None,
-        weight_decay: float = 0.0,
-        **kwargs
-    ) -> None:
-        # language=rst
-        """
-        Constructor for abstract base class for connection objects.
-
-        :param source: A layer of nodes from which the connection originates.
-        :param target: A layer of nodes to which the connection connects.
-        :param nu: Learning rate for both pre- and post-synaptic events.
-        :param reduction: Method for reducing parameter updates along the minibatch dimension.
-        :param weight_decay: Constant multiple to decay weights by on each iteration.
-
-        Keyword arguments:
-
-        :param LearningRule update_rule: Modifies connection parameters according to some rule.
-        :param float wmin: The minimum value on the connection weights.
-        :param float wmax: The maximum value on the connection weights.
-        :param float norm: Total weight per target neuron normalization.
-        :param ByteTensor norm_by_max: Normalize the weight of a neuron by its max weight.
-        :param ByteTensor norm_by_max_with_shadow_weights: Normalize the weight of a neuron by its max weight by
-                                                                original weights
-        """
-        super().__init__()
-
-        assert isinstance(source, Nodes), "Source is not a Nodes object"
-        assert isinstance(target, Nodes), "Target is not a Nodes object"
-
-        self.source = source
-        self.target = target
-
-        self.nu = nu
-        self.weight_decay = weight_decay
-        self.reduction = reduction
-
-        from ..learning import NoOp
-
-        self.update_rule = kwargs.get("update_rule", NoOp)
-        self.wmin = kwargs.get("wmin", -np.inf)
-        self.wmax = kwargs.get("wmax", np.inf)
-        self.norm = kwargs.get("norm", None)
-        self.decay = kwargs.get("decay", None)
-        self.norm_by_max = kwargs.get("norm_by_max", False)
-        self.norm_by_max_from_shadow_weights = kwargs.get(
-            "norm_by_max_from_shadow_weights", False
-        )
-
-        if self.update_rule is None:
-            self.update_rule = NoOp
-
-        self.update_rule = self.update_rule(
-            connection=self,
-            nu=nu,
-            reduction=reduction,
-            weight_decay=weight_decay,
-            **kwargs
-        )
-
     @abstractmethod
-    def compute(self, s: torch.Tensor) -> None:
-        # language=rst
+    def get_output_shape(self, in_shape: Iterable[int]):
         """
-        Compute pre-activations of downstream neurons given spikes of upstream neurons.
+        Return the output shape of this connection based on the input's
+        shape. Throws an error if there is an invalid input.
 
-        :param s: Incoming spikes.
+        :param in_shape: Input shape for the forward method. Should not
+                         include time as that will not be passed in.
+        :return: Output shape
         """
         pass
 
-    @abstractmethod
-    def update(self, **kwargs) -> None:
-        # language=rst
-        """
-        Compute connection's update rule.
-
-        Keyword arguments:
-
-        :param bool learning: Whether to allow connection updates.
-        :param ByteTensor mask: Boolean mask determining which weights to clamp to zero.
-        """
-        learning = kwargs.get("learning", True)
-
-        if learning:
-            self.update_rule.update(**kwargs)
-
-        mask = kwargs.get("mask", None)
-        if mask is not None:
-            self.w.masked_fill_(mask, 0)
-
-    @abstractmethod
-    def reset_(self) -> None:
-        # language=rst
-        """
-        Contains resetting logic for the connection.
-        """
+    def reset_(self, *args, **kwargs):
         pass
 
 
-class Connection(AbstractConnection):
+class Connection(AbstractConnection, nn.Linear):
     # language=rst
     """
     Specifies synapses between one or two populations of neurons.
+
+    Inherits from nn.Linear as the base implementation and
+    AbstractConnection to register and track the type.
+
+    TODO:
+    - Support multi timestep input through einsum
+    - Setup generic weight initialization
     """
 
-    def __init__(
-        self,
-        source: Nodes,
-        target: Nodes,
-        nu: Optional[Union[float, Sequence[float]]] = None,
-        reduction: Optional[callable] = None,
-        weight_decay: float = 0.0,
-        **kwargs
-    ) -> None:
+    def __init__(self, in_features, out_features, bias=True, weight_scale=1.0) -> None:
         # language=rst
+        super().__init__(in_features, out_features, bias)
+
+    def get_output_shape(self, in_shape: Iterable[int]):
         """
-        Instantiates a :code:`Connection` object.
+        Return the output shape of this connection based on the input's
+        shape. Throws an error if there is an invalid input.
 
-        :param source: A layer of nodes from which the connection originates.
-        :param target: A layer of nodes to which the connection connects.
-        :param nu: Learning rate for both pre- and post-synaptic events.
-        :param reduction: Method for reducing parameter updates along the minibatch dimension.
-        :param weight_decay: Constant multiple to decay weights by on each iteration.
-
-        Keyword arguments:
-
-        :param LearningRule update_rule: Modifies connection parameters according to some rule.
-        :param torch.Tensor w: Strengths of synapses.
-        :param torch.Tensor b: Target population bias.
-        :param float wmin: Minimum allowed value on the connection weights.
-        :param float wmax: Maximum allowed value on the connection weights.
-        :param float norm: Total weight per target neuron normalization constant.
-        :param ByteTensor norm_by_max: Normalize the weight of a neuron by its max weight.
-        :param ByteTensor norm_by_max_with_shadow_weights: Normalize the weight of a neuron by its max weight by
-                                                           original weights.
+        :param in_shape: Input shape for the forward method. Should not
+                         include time as that will not be passed in.
+        :return: Output shape
         """
-        super().__init__(source, target, nu, reduction, weight_decay, **kwargs)
 
-        w = kwargs.get("w", None)
-        if w is None:
-            if self.wmin == -np.inf or self.wmax == np.inf:
-                w = torch.clamp(torch.rand(source.n, target.n), self.wmin, self.wmax)
-            else:
-                w = self.wmin + torch.rand(source.n, target.n) * (self.wmax - self.wmin)
-        else:
-            if self.wmin != -np.inf or self.wmax != np.inf:
-                w = torch.clamp(w, self.wmin, self.wmax)
+        assert in_shape[-1] == self.in_features
 
-        self.w = Parameter(w, False)
-        self.b = Parameter(kwargs.get("b", torch.zeros(target.n)), False)
-
-        if self.norm_by_max_from_shadow_weights:
-            self.shadow_w = self.w.clone().detach()
-            self.prev_w = self.w.clone().detach()
-
-    def compute(self, s: torch.Tensor) -> torch.Tensor:
-        # language=rst
-        """
-        Compute pre-activations given spikes using connection weights.
-
-        :param s: Incoming spikes.
-        :return: Incoming spikes multiplied by synaptic weights (with or without
-                 decaying spike activation).
-        """
-        # Compute multiplication of spike activations by weights and add bias.
-        post = s.float().view(s.size(0), -1) @ self.w + self.b
-        return post.view(s.size(0), *self.target.shape)
-
-    def update(self, **kwargs) -> None:
-        # language=rst
-        """
-        Compute connection's update rule.
-        """
-        super().update(**kwargs)
-
-    def normalize(self) -> None:
-        # language=rst
-        """
-        Normalize weights so each target neuron has sum of connection weights equal to
-        ``self.norm``.
-        """
-        if self.norm is not None:
-            w_abs_sum = self.w.abs().sum(0).unsqueeze(0)
-            w_abs_sum[w_abs_sum == 0] = 1.0
-            self.w *= self.norm / w_abs_sum
-
-    def normalize_by_max(self) -> None:
-        # language=rst
-        """
-        Normalize weights by the max weight of the target neuron.
-        """
-        if self.norm_by_max:
-            w_max = self.w.abs().max(0)[0]
-            w_max[w_max == 0] = 1.0
-            self.w /= w_max
-
-    def normalize_by_max_from_shadow_weights(self) -> None:
-        # language=rst
-        """
-        Normalize weights by the max weight of the target neuron.
-        """
-        if self.norm_by_max_from_shadow_weights:
-            self.shadow_w += self.w - self.prev_w
-            w_max = self.shadow_w.abs().max(0)[0]
-            w_max[w_max == 0] = 1.0
-            self.w = self.shadow_w / w_max
-            self.prev_w = self.w.clone().detach()
-
-    def reset_(self) -> None:
-        # language=rst
-        """
-        Contains resetting logic for the connection.
-        """
-        super().reset_()
+        return in_shape[:-1] + (self.out_features,)
 
 
-class Conv2dConnection(AbstractConnection):
+class Conv2dConnection(AbstractConnection, nn.Conv2d):
     # language=rst
     """
     Specifies convolutional synapses between one or two populations of neurons.
@@ -244,142 +72,53 @@ class Conv2dConnection(AbstractConnection):
 
     def __init__(
         self,
-        source: Nodes,
-        target: Nodes,
-        kernel_size: Union[int, Tuple[int, int]],
-        stride: Union[int, Tuple[int, int]] = 1,
-        padding: Union[int, Tuple[int, int]] = 0,
-        dilation: Union[int, Tuple[int, int]] = 1,
-        nu: Optional[Union[float, Sequence[float]]] = None,
-        reduction: Optional[callable] = None,
-        weight_decay: float = 0.0,
-        **kwargs
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=1,
+        bias=True,
+        padding_mode="zeros",
     ) -> None:
         # language=rst
         """
-        Instantiates a ``Conv2dConnection`` object.
-
-        :param source: A layer of nodes from which the connection originates.
-        :param target: A layer of nodes to which the connection connects.
-        :param kernel_size: Horizontal and vertical size of convolutional kernels.
-        :param stride: Horizontal and vertical stride for convolution.
-        :param padding: Horizontal and vertical padding for convolution.
-        :param dilation: Horizontal and vertical dilation for convolution.
-        :param nu: Learning rate for both pre- and post-synaptic events.
-        :param reduction: Method for reducing parameter updates along the minibatch dimension.
-        :param weight_decay: Constant multiple to decay weights by on each iteration.
-
-        Keyword arguments:
-
-        :param LearningRule update_rule: Modifies connection parameters according to some rule.
-        :param torch.Tensor w: Strengths of synapses.
-        :param torch.Tensor b: Target population bias.
-        :param float wmin: Minimum allowed value on the connection weights.
-        :param float wmax: Maximum allowed value on the connection weights.
-        :param float norm: Total weight per target neuron normalization constant.
+        Instantiates a ``Conv2dConnection`` object that is based off of
+        ``nn.Conv2d``
         """
-        super().__init__(source, target, nu, reduction, weight_decay, **kwargs)
-
-        self.kernel_size = _pair(kernel_size)
-        self.stride = _pair(stride)
-        self.padding = _pair(padding)
-        self.dilation = _pair(dilation)
-
-        self.in_channels, input_height, input_width = (
-            source.shape[0],
-            source.shape[1],
-            source.shape[2],
-        )
-        self.out_channels, output_height, output_width = (
-            target.shape[0],
-            target.shape[1],
-            target.shape[2],
+        super().__init__(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride,
+            padding,
+            dilation,
+            groups,
+            bias,
+            padding_mode,
         )
 
-        width = (
-            input_height - self.kernel_size[0] + 2 * self.padding[0]
-        ) / self.stride[0] + 1
-        height = (
-            input_width - self.kernel_size[1] + 2 * self.padding[1]
-        ) / self.stride[1] + 1
-        shape = (self.in_channels, self.out_channels, int(width), int(height))
-
-        error = (
-            "Target dimensionality must be (out_channels, ?,"
-            "(input_height - filter_height + 2 * padding_height) / stride_height + 1,"
-            "(input_width - filter_width + 2 * padding_width) / stride_width + 1"
-        )
-
-        assert (
-            target.shape[0] == shape[1]
-            and target.shape[1] == shape[2]
-            and target.shape[2] == shape[3]
-        ), error
-
-        w = kwargs.get("w", None)
-        if w is None:
-            if self.wmin == -np.inf or self.wmax == np.inf:
-                w = torch.clamp(
-                    torch.rand(self.out_channels, self.in_channels, *self.kernel_size),
-                    self.wmin,
-                    self.wmax,
-                )
-            else:
-                w = (self.wmax - self.wmin) * torch.rand(
-                    self.out_channels, self.in_channels, *self.kernel_size
-                )
-                w += self.wmin
-        else:
-            if self.wmin != -np.inf or self.wmax != np.inf:
-                w = torch.clamp(w, self.wmin, self.wmax)
-
-        self.w = Parameter(w, False)
-        self.b = Parameter(kwargs.get("b", torch.zeros(self.out_channels)), False)
-
-    def compute(self, s: torch.Tensor) -> torch.Tensor:
-        # language=rst
+    def get_output_shape(self, in_shape: Iterable[int]):
         """
-        Compute convolutional pre-activations given spikes using layer weights.
+        Return the output shape of this connection based on the input's
+        shape. Throws an error if there is an invalid input.
 
-        :param s: Incoming spikes.
-        :return: Incoming spikes multiplied by synaptic weights (with or without decaying spike activation).
+        :param in_shape: Input shape for the forward method. Should not
+                         include time as that will not be passed in.
+        :return: Output shape
         """
-        return F.conv2d(
-            s.float(),
-            self.w,
-            self.b,
-            stride=self.stride,
-            padding=self.padding,
-            dilation=self.dilation,
-        )
 
-    def update(self, **kwargs) -> None:
-        # language=rst
-        """
-        Compute connection's update rule.
-        """
-        super().update(**kwargs)
+        # Pull out all dimensions that will be used
+        N, C_in, H_in, W_in = in_shape
 
-    def normalize(self) -> None:
-        # language=rst
-        """
-        Normalize weights along the first axis according to total weight per target neuron.
-        """
-        if self.norm is not None:
-            # get a view and modify in place
-            w = self.w.view(
-                self.w.size(0) * self.w.size(1), self.w.size(2) * self.w.size(3)
-            )
+        assert C_in == self.in_channels, "Input channels must match"
 
-            for fltr in range(w.size(0)):
-                w[fltr] *= self.norm / w[fltr].sum(0)
+        C_out = self.out_channels
+        H_out = (H_in - self.kernel_size[0] + 2 * self.padding[0]) / self.stride[0] + 1
+        W_out = (W_in - self.kernel_size[1] + 2 * self.padding[1]) / self.stride[1] + 1
 
-    def reset_(self) -> None:
-        # language=rst
-        """
-        Contains resetting logic for the connection.
-        """
-        super().reset_()
+        return (N, C_out, H_out, W_out)
 
 
 class MaxPool2dConnection(AbstractConnection):
@@ -423,7 +162,7 @@ class MaxPool2dConnection(AbstractConnection):
 
         self.register_buffer("firing_rates", torch.ones(source.shape))
 
-    def compute(self, s: torch.Tensor) -> torch.Tensor:
+    def forward(self, s: torch.Tensor) -> torch.Tensor:
         # language=rst
         """
         Compute max-pool pre-activations given spikes using online firing rate estimates.
@@ -580,16 +319,16 @@ class LocalConnection(AbstractConnection):
             if self.wmin != -np.inf or self.wmax != np.inf:
                 w = torch.clamp(w, self.wmin, self.wmax)
 
-        self.w = Parameter(w, False)
+        self.w = nn.Parameter(w, False)
 
         self.register_buffer("mask", self.w == 0)
 
-        self.b = Parameter(kwargs.get("b", torch.zeros(target.n)), False)
+        self.b = nn.Parameter(kwargs.get("b", torch.zeros(target.n)), False)
 
         if self.norm is not None:
             self.norm *= kernel_prod
 
-    def compute(self, s: torch.Tensor) -> torch.Tensor:
+    def forward(self, s: torch.Tensor) -> torch.Tensor:
         # language=rst
         """
         Compute pre-activations given spikes using layer weights.
@@ -642,7 +381,8 @@ class LocalConnection(AbstractConnection):
 class MeanFieldConnection(AbstractConnection):
     # language=rst
     """
-    A connection between one or two populations of neurons which computes a summary of the pre-synaptic population to
+    A connection between one or two populations of neurons which
+    computes a summary of the pre-synaptic population to
     use as weighted input to the post-synaptic population.
     """
 
@@ -680,9 +420,9 @@ class MeanFieldConnection(AbstractConnection):
             if self.wmin != -np.inf or self.wmax != np.inf:
                 w = torch.clamp(w, self.wmin, self.wmax)
 
-        self.w = Parameter(w, False)
+        self.w = nn.Parameter(w, False)
 
-    def compute(self, s: torch.Tensor) -> torch.Tensor:
+    def forward(self, s: torch.Tensor) -> torch.Tensor:
         # language=rst
         """
         Compute pre-activations given spikes using layer weights.
@@ -783,9 +523,9 @@ class SparseConnection(AbstractConnection):
             if self.wmin != -np.inf or self.wmax != np.inf:
                 w = torch.clamp(w, self.wmin, self.wmax)
 
-        self.w = Parameter(w, False)
+        self.w = nn.Parameter(w, False)
 
-    def compute(self, s: torch.Tensor) -> torch.Tensor:
+    def forward(self, s: torch.Tensor) -> torch.Tensor:
         # language=rst
         """
         Compute convolutional pre-activations given spikes using layer weights.

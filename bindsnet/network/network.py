@@ -231,6 +231,156 @@ class Network(torch.nn.Module):
 
         return inpts
 
+    def run_one_step(self, inpts: Dict[str, torch.Tensor], time: int, **kwargs) -> None:
+        # language=rst
+        """
+        Simulate network for given inputs and time in a one step feed
+        forward manner. Each timestep will see spikes propagate through
+        the whole network. More like a wave front.
+
+        :param inpts: Dictionary of ``Tensor``s of shape ``[time, *input_shape]`` or
+                      ``[batch_size, time, *input_shape]``.
+        :param time: Simulation time.
+
+        Keyword arguments:
+
+        :param Dict[str, torch.Tensor] clamp: Mapping of layer names to boolean masks if
+            neurons should be clamped to spiking. The ``Tensor``s have shape
+            ``[n_neurons]`` or ``[time, n_neurons]``.
+        :param Dict[str, torch.Tensor] unclamp: Mapping of layer names to boolean masks
+            if neurons should be clamped to not spiking. The ``Tensor``s should have
+            shape ``[n_neurons]`` or ``[time, n_neurons]``.
+        :param Dict[str, torch.Tensor] injects_v: Mapping of layer names to boolean
+            masks if neurons should be added voltage. The ``Tensor``s should have shape
+            ``[n_neurons]`` or ``[time, n_neurons]``.
+        :param Union[float, torch.Tensor] reward: Scalar value used in reward-modulated
+            learning.
+        :param Dict[Tuple[str], torch.Tensor] masks: Mapping of connection names to
+            boolean masks determining which weights to clamp to zero.
+        """
+        # Effective number of timesteps.
+        timesteps = int(time / self.dt)
+
+        # Simulate network activity for `time` timesteps.
+        for t in range(timesteps):
+            for l in self.layers:
+                # Update each layer of nodes.
+                if isinstance(self.layers[l], AbstractInput):
+                    # shape is [time, batch, n_0, ...]
+                    self.layers[l](x=inpts[l][t])
+                else:
+                    # Get input to this layer
+                    inpts.update(self._get_inputs(layers=[l]))
+
+                    self.layers[l](x=inpts[l])
+
+                # Clamp neurons to spike.
+                clamp = clamps.get(l, None)
+                if clamp is not None:
+                    if clamp.ndimension() == 1:
+                        self.layers[l].s[:, clamp] = 1
+                    else:
+                        self.layers[l].s[:, clamp[t]] = 1
+
+                # Clamp neurons not to spike.
+                unclamp = unclamps.get(l, None)
+                if unclamp is not None:
+                    if unclamp.ndimension() == 1:
+                        self.layers[l].s[unclamp] = 0
+                    else:
+                        self.layers[l].s[unclamp[t]] = 0
+
+                # Inject voltage to neurons.
+                inject_v = injects_v.get(l, None)
+                if inject_v is not None:
+                    if inject_v.ndimension() == 1:
+                        self.layers[l].v += inject_v
+                    else:
+                        self.layers[l].v += inject_v[t]
+
+            # Record state variables of interest.
+            for m in self.monitors:
+                self.monitors[m].record()
+
+    def run_synchronous(
+        self, inpts: Dict[str, torch.Tensor], time: int, **kwargs
+    ) -> None:
+        # language=rst
+        """
+        Simulate network for given inputs and time in an synchronous
+        manner. Update nodes, then connections, and repeat.
+
+        :param inpts: Dictionary of ``Tensor``s of shape ``[time, *input_shape]`` or
+                      ``[batch_size, time, *input_shape]``.
+        :param time: Simulation time.
+
+        Keyword arguments:
+
+        :param Dict[str, torch.Tensor] clamp: Mapping of layer names to boolean masks if
+            neurons should be clamped to spiking. The ``Tensor``s have shape
+            ``[n_neurons]`` or ``[time, n_neurons]``.
+        :param Dict[str, torch.Tensor] unclamp: Mapping of layer names to boolean masks
+            if neurons should be clamped to not spiking. The ``Tensor``s should have
+            shape ``[n_neurons]`` or ``[time, n_neurons]``.
+        :param Dict[str, torch.Tensor] injects_v: Mapping of layer names to boolean
+            masks if neurons should be added voltage. The ``Tensor``s should have shape
+            ``[n_neurons]`` or ``[time, n_neurons]``.
+        :param Union[float, torch.Tensor] reward: Scalar value used in reward-modulated
+            learning.
+        :param Dict[Tuple[str], torch.Tensor] masks: Mapping of connection names to
+            boolean masks determining which weights to clamp to zero.
+        """
+        # Effective number of timesteps.
+        timesteps = int(time / self.dt)
+
+        # Get input to all layers
+        inpts.update(self._get_inputs())
+
+        # Simulate network activity for `time` timesteps.
+        for t in range(timesteps):
+            for l in self.layers:
+                # Update each layer of nodes.
+                if isinstance(self.layers[l], AbstractInput):
+                    # shape is [time, batch, n_0, ...]
+                    self.layers[l].forward(x=inpts[l][t])
+                else:
+                    if one_step:
+                        # Get input to this layer (one-step mode).
+                        inpts.update(self._get_inputs(layers=[l]))
+
+                    self.layers[l].forward(x=inpts[l])
+
+                # Clamp neurons to spike.
+                clamp = clamps.get(l, None)
+                if clamp is not None:
+                    if clamp.ndimension() == 1:
+                        self.layers[l].s[:, clamp] = 1
+                    else:
+                        self.layers[l].s[:, clamp[t]] = 1
+
+                # Clamp neurons not to spike.
+                unclamp = unclamps.get(l, None)
+                if unclamp is not None:
+                    if unclamp.ndimension() == 1:
+                        self.layers[l].s[unclamp] = 0
+                    else:
+                        self.layers[l].s[unclamp[t]] = 0
+
+                # Inject voltage to neurons.
+                inject_v = injects_v.get(l, None)
+                if inject_v is not None:
+                    if inject_v.ndimension() == 1:
+                        self.layers[l].v += inject_v
+                    else:
+                        self.layers[l].v += inject_v[t]
+
+            # Get input to all layers.
+            inpts.update(self._get_inputs())
+
+            # Record state variables of interest.
+            for m in self.monitors:
+                self.monitors[m].record()
+
     def run(
         self, inpts: Dict[str, torch.Tensor], time: int, one_step=False, **kwargs
     ) -> None:
@@ -297,14 +447,11 @@ class Network(torch.nn.Module):
         masks = kwargs.get("masks", {})
         injects_v = kwargs.get("injects_v", {})
 
-        self.set_shapes(None)
-
-        # Compute reward.
-        if self.reward_fn is not None:
-            kwargs["reward"] = self.reward_fn.compute(**kwargs)
-
-        # Dynamic setting of batch size.
+        # Dynamic setting of Network shape
         if inpts != {}:
+            final_layer_shapes = {}
+            layer_shape_setter = {}
+
             for key in inpts:
                 # goal shape is [time, batch, n_0, ...]
                 if len(inpts[key].size()) == 1:
@@ -317,77 +464,28 @@ class Network(torch.nn.Module):
                     # [time, 1, n_0, ...]
                     inpts[key] = inpts[key].unsqueeze(1)
 
-            for key in inpts:
-                # batch dimension is 1, grab this and use for batch size
-                if inpts[key].size(1) != self.batch_size:
-                    self.batch_size = inpts[key].size(1)
+                # check what the other shapes should be given the
+                # current one
+                layer_shapes = self.propagate_shapes(key, inpts[key].shape[1:])
+                for k, s in layer_shapes.items():
+                    if k in final_layer_shapes:
+                        error = (
+                            "Shape mismatch in two propagation directions"
+                            "- Input %s claims %s"
+                            "- Input %s claims %s"
+                        ) % (key, s, layer_shape_setter[k], final_layer_shapes[k])
 
-                    for m in self.monitors:
-                        self.monitors[m].reset_()
-
-                break
-
-        # Effective number of timesteps.
-        timesteps = int(time / self.dt)
-
-        # Get input to all layers (synchronous mode).
-        if not one_step:
-            inpts.update(self._get_inputs())
-
-        # Simulate network activity for `time` timesteps.
-        for t in range(timesteps):
-            for l in self.layers:
-                # Update each layer of nodes.
-                if isinstance(self.layers[l], AbstractInput):
-                    # shape is [time, batch, n_0, ...]
-                    self.layers[l].forward(x=inpts[l][t])
-                else:
-                    if one_step:
-                        # Get input to this layer (one-step mode).
-                        inpts.update(self._get_inputs(layers=[l]))
-
-                    self.layers[l].forward(x=inpts[l])
-
-                # Clamp neurons to spike.
-                clamp = clamps.get(l, None)
-                if clamp is not None:
-                    if clamp.ndimension() == 1:
-                        self.layers[l].s[:, clamp] = 1
+                        assert s == final_layer_shapes[k], error
                     else:
-                        self.layers[l].s[:, clamp[t]] = 1
+                        layer_shape_setter[k] = key
+                        final_layer_shapes[k] = s
 
-                # Clamp neurons not to spike.
-                unclamp = unclamps.get(l, None)
-                if unclamp is not None:
-                    if unclamp.ndimension() == 1:
-                        self.layers[l].s[unclamp] = 0
-                    else:
-                        self.layers[l].s[unclamp[t]] = 0
+                self.set_shapes(final_layer_shapes)
 
-                # Inject voltage to neurons.
-                inject_v = injects_v.get(l, None)
-                if inject_v is not None:
-                    if inject_v.ndimension() == 1:
-                        self.layers[l].v += inject_v
-                    else:
-                        self.layers[l].v += inject_v[t]
-
-            # Run synapse updates.
-            for c in self.connections:
-                self.connections[c].update(
-                    mask=masks.get(c, None), learning=self.training, **kwargs
-                )
-
-            # Get input to all layers.
-            inpts.update(self._get_inputs())
-
-            # Record state variables of interest.
-            for m in self.monitors:
-                self.monitors[m].record()
-
-        # Re-normalize connections.
-        for c in self.connections:
-            self.connections[c].normalize()
+        if one_step:
+            self.run_one_step(inpts, time, **kwargs)
+        else:
+            self.run_synchronous(inpts, time, **kwargs)
 
     def reset_(self) -> None:
         # language=rst
@@ -403,15 +501,37 @@ class Network(torch.nn.Module):
         for monitor in self.monitors:
             self.monitors[monitor].reset_()
 
-    def check_valid_shape_prop(self, start_node: str) -> bool:
-        return
+    def propagate_shapes(
+        self, start_node: str, start_shape: Iterable[int]
+    ) -> Dict[Iterable[int]]:
+        layer_shapes = {start_node: start_shape}
 
-    def compute_shapes(
-        self, input_shapes: Dict[str, Iterable[int]]
-    ) -> Dict[str, Iterable[int]]:
-        return
+        forward_connections = defaultdict(list)
 
-    def set_shapes(self, network_shapes):
-        for layer in self.layers.values():
-            layer.reset_(layer.shape)
-            layer.set_dt(self.dt)
+        for c in self.connections.keys():
+            forward_connections[c[0]].append(c)
+
+        # BFS search through layers
+        search_queue = [start_node]
+
+        while search_queue:
+            next_node = search_queue.pop(0)
+
+            for fc in forward_connections[next_node]:
+                # find input shape and compute output shape
+                in_shape = layer_shapes[fc[0]]
+                out_shape = self.connections[fc].get_output_shape(in_shape)
+
+                if fc[1] not in layer_shapes:
+                    # Set first instance of shape and then search leaves
+                    layer_shapes[fc[1]] = out_shape
+                    search_queue.append(fc[1])
+                else:
+                    # Assert consistency in cycles
+                    assert layer_shapes[fc[1]] == out_shape
+
+        return layer_shapes
+
+    def set_shapes(self, network_shapes: Dict[str, Iterable[int]]) -> None:
+        for k, layer in self.layers.items():
+            layer.reset_(network_shapes[k])

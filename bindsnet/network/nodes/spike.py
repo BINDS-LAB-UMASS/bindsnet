@@ -13,8 +13,10 @@ class SuperSpike(torch.nn.Module):
     :param thresh: Initialization of spike threshold
     """
 
-    def __init__(self, thresh: float = 0.0):
+    def __init__(self, scale: float = 100.0):
         super().__init__()
 
+        self.scale = torch.tensor(scale, dtype=torch.float)
+
     def forward(self, v):
-        return F.super_spike(v)
+        return F.super_spike(v, self.scale)

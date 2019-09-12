@@ -6,13 +6,17 @@ from typing import Tuple
 class _SuperSpike(torch.autograd.Function):
     """
     Zenke & Ganguli 2018
+
+    Many thanks to the inspiration from:
+
+    https://github.com/fzenke/spytorch
     """
 
-    scale = 10.0
-
     @staticmethod
-    def forward(ctx, v):
-        ctx.save_for_backward(v)
+    def forward(ctx, v, scale):
+        assert scale.requires_grad == False, "No gradient to scale"
+
+        ctx.save_for_backward(v, scale)
 
         out = torch.zeros_like(v)
         out[v >= 0.0] = 1.0
@@ -21,11 +25,11 @@ class _SuperSpike(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        (input,) = ctx.saved_tensors
-        grad_input = grad_output.clone()
+        (input, scale) = ctx.saved_tensors
 
-        grad = grad_input / (_SuperSpike.scale * torch.abs(input) + 1.0) ** 2
-        return grad
+        grad = grad_output / (scale * torch.abs(input) + 1.0) ** 2
+
+        return grad, None
 
 
 super_spike = _SuperSpike.apply
@@ -33,21 +37,17 @@ super_spike = _SuperSpike.apply
 
 def super_spike_update(
     v: torch.Tensor,
-    refrac_count: torch.Tensor,
     thresh: torch.Tensor,
     reset: torch.Tensor,
-    refrac: torch.Tensor,
     lbound: torch.Tensor,
-    dt: torch.Tensor,
+    scale: torch.Tensor,
 ):
     """
-    Spike and refractory update of a neuron
+    Spike update of a neuron
     """
 
-    refrac_count = (refrac_count > 0).float() * (refrac_count - dt)
-
     # check for v >= thresh
-    s = super_spike(v - thresh)
+    s = super_spike(v - thresh, scale)
     s_ = s.byte()
 
     # reset voltage upon spikes
@@ -56,16 +56,12 @@ def super_spike_update(
     # bound voltage
     v = torch.where(v < lbound, lbound.expand(*v.shape), v)
 
-    # reset refrac on spike
-    refrac_count = torch.where(s_, refrac.expand(*v.shape), refrac_count)
-
     # Return the states that were updated
-    return s, v, refrac_count
+    return s, v
 
 
-def if_update(
-    x: torch.Tensor, v: torch.Tensor, refrac_count: torch.Tensor
-) -> torch.Tensor:
+@torch.jit.script
+def if_update(x: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
     """
     Update of `integrate-and-fire (IF) neurons <http://neuronaldynamics.epfl.ch/online/Ch1.S3.html>`_.
 
@@ -73,9 +69,21 @@ def if_update(
     :param v: Membrane potential
     :return: New membrane potential
     """
-    dv = torch.where(
-        refrac_count == 0,
-        x,
-        torch.zeros(1, dtype=v.dtype, device=v.device).expand(v.shape),
-    )
-    return v + dv
+
+    v = v + x
+
+    return v
+
+
+@torch.jit.script
+def lif_update(
+    x: torch.Tensor, v: torch.Tensor, decay: torch.Tensor, rest: torch.Tensor
+) -> torch.Tensor:
+    """
+    Layer of `leaky integrate-and-fire (LIF) neurons
+    <http://icwww.epfl.ch/~gerstner/SPNM/node26.html#SECTION02311000000000000000>`_.
+    """
+
+    v = decay * (v - rest) + rest + x
+
+    return v

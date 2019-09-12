@@ -27,7 +27,7 @@ class Monitor(AbstractMonitor):
         obj: Union[Nodes, AbstractConnection],
         state_vars: Iterable[str],
         time: Optional[int] = None,
-        detach: bool = True,
+        detach: bool = False,
     ):
         # language=rst
         """
@@ -65,7 +65,10 @@ class Monitor(AbstractMonitor):
         """
         for v in self.state_vars:
             data = getattr(self.obj, v).unsqueeze(0)
-            self.recording[v].append(data.detach().clone())
+            if self.detach:
+                self.recording[v].append(data.detach().clone())
+            else:
+                self.recording[v].append(data.clone())
 
         # remove the oldest element (first in the list)
         if self.time is not None:
