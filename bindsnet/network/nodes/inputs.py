@@ -64,6 +64,8 @@ class Input(Nodes, AbstractInput):
         # Set spike occurrences to input values.
         self.s = x.byte()
 
+        return self.s
+
     def reset_(self, shape: Optional[Iterable[int]] = None) -> None:
         # language=rst
         """
@@ -120,6 +122,8 @@ class RealInput(Nodes, AbstractInput):
         """
         # Set spike occurrences to input values.
         self.s = self.dt * x
+
+        return self.s
 
     def reset_(self, shape: Optional[Iterable[int]] = None) -> None:
         # language=rst

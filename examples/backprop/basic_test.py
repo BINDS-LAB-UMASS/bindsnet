@@ -69,6 +69,7 @@ C1 = T.Connection(nb_inputs, nb_hidden)
 C2 = T.Connection(nb_hidden, nb_outputs)
 
 from bindsnet.network import Network
+from bindsnet.network.monitors import Monitor
 
 network = Network()
 network.add_layer(I, "I")
@@ -78,12 +79,9 @@ network.add_layer(R, "R")
 network.add_connection(C1, "I", "H")
 network.add_connection(C2, "H", "R")
 
-layer_shapes = network.propagate_shapes("I", (batch_size, nb_inputs))
-network.set_shapes(layer_shapes)
+network.add_monitor(Monitor(R, ["s", "v"]), "M")
 
-print(layer_shapes)
-assert False
-
+network.to(device)
 
 # net = nn.Sequential(C1, H, C2, R).to(device)
 #
@@ -93,26 +91,18 @@ assert False
 def run_snn(inputs):
     inputs = inputs.view(nb_steps, batch_size, -1)
 
-    H.reset_(shape=(batch_size, nb_hidden))
-    R.reset_(shape=(batch_size, nb_outputs))
+    network.reset_()
 
-    out_rec = []
-    h_rec = []
+    network.run({"I": inputs}, time=nb_steps)
 
-    # Compute hidden layer activity
-    for t in range(nb_steps):
-        net_out = net(inputs[t])
-        h_rec.append(H.s)
-        out_rec.append(net_out)
-
-    out_rec = torch.stack(out_rec, dim=0)
-    other_recs = [torch.stack(h_rec, dim=0)]
+    out_rec = network.monitors["M"].get("s")
+    other_recs = [network.monitors["M"].get("v")]
 
     return out_rec, other_recs
 
 
 def train(dataset, lr=2e-3, nb_epochs=10):
-    params = net.parameters()
+    params = network.parameters()
     optimizer = torch.optim.Adam(params, lr=lr, betas=(0.9, 0.999))
 
     log_softmax_fn = nn.LogSoftmax(dim=1)

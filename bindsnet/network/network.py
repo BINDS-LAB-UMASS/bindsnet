@@ -102,6 +102,8 @@ class Network(torch.nn.Module):
         self.batch_size = batch_size
 
         self.layers = OrderedDict()
+        self.layers_out = {}
+
         self.connections = OrderedDict()
         self.monitors = OrderedDict()
 
@@ -218,16 +220,18 @@ class Network(torch.nn.Module):
         for c in self.connections:
             if c[1] in layers:
                 # Fetch source and target populations.
-                source = self.connections[c].source
-                target = self.connections[c].target
+                source = c[0]  # self.connections[c].source
+                target = c[1]  # self.connections[c].target
 
                 if not c[1] in inpts:
                     inpts[c[1]] = torch.zeros(
-                        self.batch_size, *target.shape, device=target.s.device
+                        *self.layers[target].s.shape,
+                        device=self.layers[target].s.device,
+                        dtype=self.layers[target].v.dtype,
                     )
 
                 # Add to input: source's spikes multiplied by connection weights.
-                inpts[c[1]] += self.connections[c].compute(source.s)
+                inpts[target] += self.connections[c](self.layers_out[source])
 
         return inpts
 
@@ -267,36 +271,12 @@ class Network(torch.nn.Module):
                 # Update each layer of nodes.
                 if isinstance(self.layers[l], AbstractInput):
                     # shape is [time, batch, n_0, ...]
-                    self.layers[l](x=inpts[l][t])
+                    self.layers_out[l] = self.layers[l](x=inpts[l][t]).float()
                 else:
                     # Get input to this layer
                     inpts.update(self._get_inputs(layers=[l]))
 
-                    self.layers[l](x=inpts[l])
-
-                # Clamp neurons to spike.
-                clamp = clamps.get(l, None)
-                if clamp is not None:
-                    if clamp.ndimension() == 1:
-                        self.layers[l].s[:, clamp] = 1
-                    else:
-                        self.layers[l].s[:, clamp[t]] = 1
-
-                # Clamp neurons not to spike.
-                unclamp = unclamps.get(l, None)
-                if unclamp is not None:
-                    if unclamp.ndimension() == 1:
-                        self.layers[l].s[unclamp] = 0
-                    else:
-                        self.layers[l].s[unclamp[t]] = 0
-
-                # Inject voltage to neurons.
-                inject_v = injects_v.get(l, None)
-                if inject_v is not None:
-                    if inject_v.ndimension() == 1:
-                        self.layers[l].v += inject_v
-                    else:
-                        self.layers[l].v += inject_v[t]
+                    self.layers_out[l] = self.layers[l](x=inpts[l]).float()
 
             # Record state variables of interest.
             for m in self.monitors:
@@ -342,37 +322,9 @@ class Network(torch.nn.Module):
                 # Update each layer of nodes.
                 if isinstance(self.layers[l], AbstractInput):
                     # shape is [time, batch, n_0, ...]
-                    self.layers[l].forward(x=inpts[l][t])
+                    self.layers_out[l] = self.layers[l](x=inpts[l][t]).float()
                 else:
-                    if one_step:
-                        # Get input to this layer (one-step mode).
-                        inpts.update(self._get_inputs(layers=[l]))
-
-                    self.layers[l].forward(x=inpts[l])
-
-                # Clamp neurons to spike.
-                clamp = clamps.get(l, None)
-                if clamp is not None:
-                    if clamp.ndimension() == 1:
-                        self.layers[l].s[:, clamp] = 1
-                    else:
-                        self.layers[l].s[:, clamp[t]] = 1
-
-                # Clamp neurons not to spike.
-                unclamp = unclamps.get(l, None)
-                if unclamp is not None:
-                    if unclamp.ndimension() == 1:
-                        self.layers[l].s[unclamp] = 0
-                    else:
-                        self.layers[l].s[unclamp[t]] = 0
-
-                # Inject voltage to neurons.
-                inject_v = injects_v.get(l, None)
-                if inject_v is not None:
-                    if inject_v.ndimension() == 1:
-                        self.layers[l].v += inject_v
-                    else:
-                        self.layers[l].v += inject_v[t]
+                    self.layers_out[l] = self.layers[l].forward(x=inpts[l]).float()
 
             # Get input to all layers.
             inpts.update(self._get_inputs())
@@ -449,9 +401,6 @@ class Network(torch.nn.Module):
 
         # Dynamic setting of Network shape
         if inpts != {}:
-            final_layer_shapes = {}
-            layer_shape_setter = {}
-
             for key in inpts:
                 # goal shape is [time, batch, n_0, ...]
                 if len(inpts[key].size()) == 1:
@@ -464,6 +413,16 @@ class Network(torch.nn.Module):
                     # [time, 1, n_0, ...]
                     inpts[key] = inpts[key].unsqueeze(1)
 
+            final_layer_shapes = {}
+            layer_shape_setter = {}
+
+            recompute = False
+
+            for key in inpts:
+                if not inpts[key].shape[1:] == self.layers[key].s.shape:
+                    recompute = True
+
+            if recompute:
                 # check what the other shapes should be given the
                 # current one
                 layer_shapes = self.propagate_shapes(key, inpts[key].shape[1:])
@@ -480,7 +439,14 @@ class Network(torch.nn.Module):
                         layer_shape_setter[k] = key
                         final_layer_shapes[k] = s
 
+                print(
+                    "Input shapes changed, recomputed node shapes", final_layer_shapes
+                )
+
                 self.set_shapes(final_layer_shapes)
+
+        for k, l in self.layers.items():
+            self.layers_out[k] = l.s.float()
 
         if one_step:
             self.run_one_step(inpts, time, **kwargs)
@@ -503,7 +469,7 @@ class Network(torch.nn.Module):
 
     def propagate_shapes(
         self, start_node: str, start_shape: Iterable[int]
-    ) -> Dict[Iterable[int]]:
+    ) -> Dict[str, Iterable[int]]:
         layer_shapes = {start_node: start_shape}
 
         forward_connections = defaultdict(list)

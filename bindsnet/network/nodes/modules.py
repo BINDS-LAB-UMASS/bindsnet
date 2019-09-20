@@ -31,6 +31,8 @@ class Nodes(torch.nn.Module):
         self.register_buffer("s", torch.FloatTensor())  # Spikes
 
         if n is None and shape is None:
+            self.n = None
+            self.shape = None
             return
 
         if n is None:
@@ -55,10 +57,11 @@ class Nodes(torch.nn.Module):
         """
         Abstract base class method for resetting state variables.
         """
-        if shape is None:
-            return
-        else:
+        if shape is not None:
             self.shape = shape
+
+        if self.shape is None:
+            return
 
         self.s = torch.zeros(*self.shape, dtype=self.s.dtype, device=self.s.device)
 
