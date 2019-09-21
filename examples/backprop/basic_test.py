@@ -110,7 +110,8 @@ def train(dataset, lr=2e-3, nb_epochs=10):
 
     loss_hist = []
     for e in range(nb_epochs):
-        local_loss = []
+        losses = []
+        accuracies = []
 
         data_loader = DataLoader(
             dataset,
@@ -132,14 +133,19 @@ def train(dataset, lr=2e-3, nb_epochs=10):
             log_p_y = log_softmax_fn(output.sum(dim=0))
 
             loss_val = loss_fn(log_p_y, y)
+            losses.append(loss_val.item())
+
+            predictions = torch.argmax(log_p_y, axis=1)
+            accuracy = torch.mean((predictions == y).float()).item() * 100
+            accuracies.append(accuracy)
 
             optimizer.zero_grad()
             loss_val.backward()
             optimizer.step()
-            local_loss.append(loss_val.item())
 
-        mean_loss = np.mean(local_loss)
-        print("Epoch %i: loss=%.5f" % (e + 1, mean_loss))
+        mean_loss = np.mean(losses)
+        mean_accuracy = np.mean(accuracies)
+        print("Epoch %i: loss=%.5f, accuracy=%.2f" % (e + 1, mean_loss, mean_accuracy))
 
 
 train(train_dataset, lr=2e-3, nb_epochs=30)
