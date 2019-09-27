@@ -115,8 +115,77 @@ class Conv2dConnection(AbstractConnection, nn.Conv2d):
         assert C_in == self.in_channels, "Input channels must match"
 
         C_out = self.out_channels
-        H_out = (H_in - self.kernel_size[0] + 2 * self.padding[0]) / self.stride[0] + 1
-        W_out = (W_in - self.kernel_size[1] + 2 * self.padding[1]) / self.stride[1] + 1
+        H_out = int(
+            (H_in - self.kernel_size[0] + 2 * self.padding[0]) / self.stride[0] + 1
+        )
+        W_out = int(
+            (W_in - self.kernel_size[1] + 2 * self.padding[1]) / self.stride[1] + 1
+        )
+
+        return (N, C_out, H_out, W_out)
+
+
+class UpConv2dConnection(AbstractConnection, nn.Module):
+    # language=rst
+    """
+    Specifies convolutional synapses between one or two populations of neurons.
+    """
+
+    def __init__(
+        self,
+        scale,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=1,
+        bias=True,
+        padding_mode="zeros",
+    ) -> None:
+        # language=rst
+        """
+        Instantiates a ``UpConv2dConnection`` object that is based off of
+        ``nn.Conv2d`` and upsample
+        """
+
+        super().__init__()
+        self.scale = scale
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+
+    def forward(self, x):
+        x = F.upsample(x, scale_factor=self.scale, mode="nearest")
+        return self.conv(x)
+
+    def get_output_shape(self, in_shape: Iterable[int]):
+        """
+        Return the output shape of this connection based on the input's
+        shape. Throws an error if there is an invalid input.
+
+        :param in_shape: Input shape for the forward method. Should not
+                         include time as that will not be passed in.
+        :return: Output shape
+        """
+
+        # Pull out all dimensions that will be used
+        N, C_in, H_in, W_in = in_shape
+        H_in *= self.scale
+        W_in *= self.scale
+
+        assert C_in == self.conv.in_channels, "Input channels must match"
+
+        C_out = self.conv.out_channels
+        H_out = int(
+            (H_in - self.conv.kernel_size[0] + 2 * self.conv.padding[0])
+            / self.conv.stride[0]
+            + 1
+        )
+        W_out = int(
+            (W_in - self.conv.kernel_size[1] + 2 * self.conv.padding[1])
+            / self.conv.stride[1]
+            + 1
+        )
 
         return (N, C_out, H_out, W_out)
 
