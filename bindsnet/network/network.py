@@ -480,6 +480,9 @@ class Network(torch.nn.Module):
         # BFS search through layers
         search_queue = [start_node]
 
+        # Shape trace keeps track in case of an error
+        shape_trace = []
+
         while search_queue:
             next_node = search_queue.pop(0)
 
@@ -488,13 +491,27 @@ class Network(torch.nn.Module):
                 in_shape = layer_shapes[fc[0]]
                 out_shape = self.connections[fc].get_output_shape(in_shape)
 
+                shape_trace.append(
+                    (type(self.connections[fc]), fc[0], fc[1], in_shape, out_shape)
+                )
+
                 if fc[1] not in layer_shapes:
                     # Set first instance of shape and then search leaves
                     layer_shapes[fc[1]] = out_shape
                     search_queue.append(fc[1])
                 else:
                     # Assert consistency in cycles
-                    assert layer_shapes[fc[1]] == out_shape
+                    if not layer_shapes[fc[1]] == out_shape:
+                        error_msg = (
+                            "Shape doesn't match between multi path propagation:"
+                        )
+                        for st in shape_trace:
+                            error_msg += (
+                                "\n-- {type: %s, source: %s, destination: %s, source_shape: %s, destination_shape: %s"
+                                % st
+                            )
+                        error_msg += "\n"
+                        raise RuntimeError(error_msg)
 
         return layer_shapes
 
