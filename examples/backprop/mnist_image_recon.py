@@ -19,7 +19,7 @@ from torchvision import transforms
 time_step = 1.0
 nb_steps = 100
 
-batch_size = 16
+batch_size = 64
 
 tau_mem = 10e-3
 
@@ -52,6 +52,7 @@ down_nodes = [
         lbound=-1.0,
         rest=0.0,
         tc_decay=float(np.exp(-time_step / tau_mem)),
+        scale=10.,
     ),
     N.LIFNodes(
         thresh=1.0,
@@ -59,6 +60,7 @@ down_nodes = [
         lbound=-1.0,
         rest=0.0,
         tc_decay=float(np.exp(-time_step / tau_mem)),
+        scale=10.,
     ),
 ]
 
@@ -71,6 +73,7 @@ up_nodes = [
         lbound=-1.0,
         rest=0.0,
         tc_decay=float(np.exp(-time_step / tau_mem)),
+        scale=10.,
     ),
     N.LIFNodes(
         thresh=1.0,
@@ -78,6 +81,7 @@ up_nodes = [
         lbound=-1.0,
         rest=0.0,
         tc_decay=float(np.exp(-time_step / tau_mem)),
+        scale=10.,
     ),
     N.LIFNodes(
         thresh=1.0,
@@ -85,6 +89,7 @@ up_nodes = [
         lbound=-1.0,
         rest=0.0,
         tc_decay=float(np.exp(-time_step / tau_mem)),
+        scale=10.,
     ),
 ]
 
@@ -144,7 +149,7 @@ from tensorboardX import SummaryWriter
 writer = SummaryWriter("logs/image_recon")
 
 
-def train(dataset, lr=2e-1, nb_epochs=30):
+def train(dataset, lr=2e-3, nb_epochs=30):
     params = network.parameters()
     optimizer = torch.optim.Adam(params, lr=lr, betas=(0.9, 0.999))
     lr_sched = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.99)
@@ -183,22 +188,22 @@ def train(dataset, lr=2e-1, nb_epochs=30):
             if total_step % 10 == 0:
                 writer.add_image(
                     "input",
-                    make_grid(x.sum(dim=0) / 100.0, nrow=4),
+                    make_grid(x.sum(dim=0) / 100.0, nrow=8),
                     global_step=total_step,
                 )
                 writer.add_image(
-                    "image", make_grid(y / 100.0, nrow=4), global_step=total_step
+                    "image", make_grid(y / 100.0, nrow=8), global_step=total_step
                 )
                 out_s = output_spikes.sum(dim=0)
                 out_s /= 100.0
                 writer.add_image(
-                    "output_spikes", make_grid(out_s, nrow=4), global_step=total_step
+                    "output_spikes", make_grid(out_s, nrow=8), global_step=total_step
                 )
                 ov = output_voltage.mean(dim=0)
                 ov -= ov.min()
                 ov /= max(ov.max(), 1.0)
                 writer.add_image(
-                    "output_voltage", make_grid(ov, nrow=4), global_step=total_step
+                    "output_voltage", make_grid(ov, nrow=8), global_step=total_step
                 )
                 writer.add_scalar("loss", loss.item(), global_step=total_step)
 
