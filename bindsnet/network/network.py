@@ -101,10 +101,12 @@ class Network(torch.nn.Module):
         self.dt = dt
         self.batch_size = batch_size
 
-        self.layers = OrderedDict()
+        self.layers = torch.nn.ModuleDict()
         self.layers_out = {}
 
-        self.connections = OrderedDict()
+        self.connections = torch.nn.ModuleDict()
+        self.connection_name_map = {}
+
         self.monitors = OrderedDict()
 
         self.train(learning)
@@ -113,6 +115,8 @@ class Network(torch.nn.Module):
             self.reward_fn = reward_fn()
         else:
             self.reward_fn = None
+
+        self.connection_delimiter = " -> "
 
     def add_layer(self, layer: Nodes, name: str) -> None:
         # language=rst
@@ -123,9 +127,16 @@ class Network(torch.nn.Module):
         :param name: Logical name of layer.
         """
         self.layers[name] = layer
-        self.add_module(name, layer)
+        # self.add_module(name, layer)
 
         layer.train(self.training)
+
+    def split_connection_name(self, connection_name):
+        source, target = connection_name.split(self.connection_delimiter)
+        return source, target
+
+    def make_connection_name(self, source, target):
+        return source + self.connection_delimiter + target
 
     def add_connection(
         self, connection: AbstractConnection, source: str, target: str
@@ -138,8 +149,9 @@ class Network(torch.nn.Module):
         :param source: Logical name of the connection's source layer.
         :param target: Logical name of the connection's target layer.
         """
-        self.connections[(source, target)] = connection
-        self.add_module(source + "_to_" + target, connection)
+        connection_name = self.make_connection_name(source, target)
+        self.connections[connection_name] = connection
+        # self.add_module(source + "_to_" + target, connection)
 
         connection.dt = self.dt
         connection.train(self.training)
@@ -218,13 +230,12 @@ class Network(torch.nn.Module):
 
         # Loop over network connections.
         for c in self.connections:
-            if c[1] in layers:
+            source, target = self.split_connection_name(c)
+            if target in layers:
                 # Fetch source and target populations.
-                source = c[0]  # self.connections[c].source
-                target = c[1]  # self.connections[c].target
 
-                if not c[1] in inpts:
-                    inpts[c[1]] = torch.zeros(
+                if not target in inpts:
+                    inpts[target] = torch.zeros(
                         *self.layers[target].s.shape,
                         device=self.layers[target].s.device,
                         dtype=self.layers[target].v.dtype,
@@ -475,7 +486,8 @@ class Network(torch.nn.Module):
         forward_connections = defaultdict(list)
 
         for c in self.connections.keys():
-            forward_connections[c[0]].append(c)
+            source, target = self.split_connection_name(c)
+            forward_connections[source].append(c)
 
         # BFS search through layers
         search_queue = [start_node]
@@ -486,22 +498,29 @@ class Network(torch.nn.Module):
         while search_queue:
             next_node = search_queue.pop(0)
 
-            for fc in forward_connections[next_node]:
+            for conn_name in forward_connections[next_node]:
+                source, target = self.split_connection_name(conn_name)
                 # find input shape and compute output shape
-                in_shape = layer_shapes[fc[0]]
-                out_shape = self.connections[fc].get_output_shape(in_shape)
+                in_shape = layer_shapes[source]
+                out_shape = self.connections[conn_name].get_output_shape(in_shape)
 
                 shape_trace.append(
-                    (type(self.connections[fc]), fc[0], fc[1], in_shape, out_shape)
+                    (
+                        type(self.connections[conn_name]),
+                        source,
+                        target,
+                        in_shape,
+                        out_shape,
+                    )
                 )
 
-                if fc[1] not in layer_shapes:
+                if target not in layer_shapes:
                     # Set first instance of shape and then search leaves
-                    layer_shapes[fc[1]] = out_shape
-                    search_queue.append(fc[1])
+                    layer_shapes[target] = out_shape
+                    search_queue.append(target)
                 else:
                     # Assert consistency in cycles
-                    if not layer_shapes[fc[1]] == out_shape:
+                    if not layer_shapes[target] == out_shape:
                         error_msg = (
                             "Shape doesn't match between multi path propagation:"
                         )

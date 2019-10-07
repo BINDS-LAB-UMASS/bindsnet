@@ -45,13 +45,21 @@ class DataLoaderPipeline(BasePipeline):
         self.pin_memory = kwargs.get("pin_memory", True)
         self.shuffle = kwargs.get("shuffle", True)
 
+    def init_fn(self):
+        """
+        Initialize the starting point before loading. This ensures that
+        we will grab the current state if it was loaded.
+        """
+        self.start_step = 0
+        self.start_epoch = 0
+
     def train(self) -> None:
         # language=rst
         """
         Training loop that runs for the set number of epochs and creates
         a new ``DataLoader`` at each epoch.
         """
-        for epoch in range(self.num_epochs):
+        for self.cur_epoch in range(self.start_epoch, self.num_epochs):
             train_dataloader = DataLoader(
                 self.train_ds,
                 batch_size=self.batch_size,
@@ -60,14 +68,35 @@ class DataLoaderPipeline(BasePipeline):
                 shuffle=self.shuffle,
             )
 
-            for step, batch in enumerate(
+            for self.cur_batch_step, batch in enumerate(
                 tqdm(
                     train_dataloader,
-                    desc="Epoch %d/%d" % (epoch + 1, self.num_epochs),
+                    desc="Epoch %d/%d" % (self.cur_epoch + 1, self.num_epochs),
                     total=len(self.train_ds) // self.batch_size,
-                )
+                    initial=self.start_step,
+                ),
+                self.start_step,
             ):
                 self.step(batch)
+
+    def save(self) -> None:
+        self.checkpoint_saver.save_checkpoint(
+            self.models_dict,
+            self.optimizers,
+            {
+                "total_step_count": self.step_count,
+                "step": self.cur_batch_step,
+                "epoch": self.cur_epoch,
+            },
+        )
+
+    def load(self) -> None:
+        extras = self.checkpoint_saver.load_checkpoint(
+            self.models_dict, self.optimizers
+        )
+        self.step_count = extras["total_step_count"]
+        self.start_step = extras["step"]
+        self.start_epoch = extras["epoch"]
 
     def test(self) -> None:
         raise NotImplementedError("You need to provide a test function.")

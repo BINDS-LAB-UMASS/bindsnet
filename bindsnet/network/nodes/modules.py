@@ -65,6 +65,31 @@ class Nodes(torch.nn.Module):
 
         self.s = torch.zeros(*self.shape, dtype=self.s.dtype, device=self.s.device)
 
+    def _load_from_state_dict(
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
+    ):
+        """ Reshape any buffers that are managed externally to what was
+        saved inside of the state dict.
+        """
+        self.reset_(state_dict[prefix + "s"].shape)
+
+        super()._load_from_state_dict(
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
+        )
+
 
 class IFNodes(Nodes):
     # language=rst

@@ -3,36 +3,11 @@ from typing import Tuple, Dict, Any
 import sys
 
 import torch
-from torch._six import container_abcs, string_classes
 
 from ..network import Network
 from ..network.monitors import Monitor
 
-
-def recursive_to(item, device):
-    # language=rst
-    """
-    Recursively transfers everything contained in item to the target
-    device.
-
-    :param item: An individual tensor or container of tensors.
-    :param device: ``torch.device`` pointing to ``"cuda"`` or ``"cpu"``.
-
-    :return: A version of the item that has been sent to a device.
-    """
-
-    if isinstance(item, torch.Tensor):
-        return item.to(device)
-    elif isinstance(item, (string_classes, int, float, bool)):
-        return item
-    elif isinstance(item, container_abcs.Mapping):
-        return {key: recursive_to(item[key], device) for key in item}
-    elif isinstance(item, tuple) and hasattr(item, "_fields"):
-        return type(item)(*(recursive_to(i, device) for i in item))
-    elif isinstance(item, container_abcs.Sequence):
-        return [recursive_to(i, device) for i in item]
-    else:
-        raise NotImplementedError(f"Target type {type(item)} not supported.")
+from .pipeline_utils import recursive_to, CheckpointSaver
 
 
 class BasePipeline:
@@ -59,9 +34,14 @@ class BasePipeline:
         """
         self.network = network
 
+        self.models_dict = {"network": network}
+        self.optimizers = {}
+
         # Network saving handles caching of intermediate results.
+        self.resume = kwargs.get("resume", True)
         self.save_dir = kwargs.get("save_dir", "network.pt")
         self.save_interval = kwargs.get("save_interval", None)
+        self.checkpoint_saver = CheckpointSaver(self.save_dir)
 
         # Handles plotting of all layer spikes and voltages.
         # This constructs monitors at every level.
@@ -96,6 +76,10 @@ class BasePipeline:
         self.step_count = 0
 
         self.init_fn()
+
+        # Load a checkpoint if it is available
+        if self.resume and self.checkpoint_saver.exists_checkpoint():
+            self.load()
 
         self.clock = time.time()
 
@@ -147,7 +131,7 @@ class BasePipeline:
             self.plots(batch, step_out)
 
         if self.save_interval is not None and self.step_count % self.save_interval == 0:
-            self.network.save(self.save_dir)
+            self.save()
 
         if self.test_interval is not None and self.step_count % self.test_interval == 0:
             self.test()
@@ -230,6 +214,19 @@ class BasePipeline:
         """
         raise NotImplementedError("You need to provide a plots method.")
 
+    def save(self) -> None:
+        self.checkpoint_saver.save_checkpoint(
+            self.models_dict, self.optimizers, {"total_step_count": self.step_count}
+        )
+
+    def load(self) -> None:
+        extras = self.checkpoint_saver.load_checkpoint(
+            self.models_dict, self.optimizers
+        )
+        self.step_count = extras["total_step_count"]
+
     def exit(self):
-        self.network.save(self.save_dir)
+        print("Requested exit. Saving.")
+        self.save()
+        print("Exiting.")
         sys.exit()
