@@ -125,7 +125,7 @@ class Conv2dConnection(AbstractConnection, nn.Conv2d):
         return (N, C_out, H_out, W_out)
 
 
-class UpConv2dConnection(AbstractConnection, nn.Module):
+class UpConv2dConnection(Conv2dConnection):
     # language=rst
     """
     Specifies convolutional synapses between one or two populations of neurons.
@@ -150,13 +150,23 @@ class UpConv2dConnection(AbstractConnection, nn.Module):
         ``nn.Conv2d`` and upsample
         """
 
-        super().__init__()
+        super().__init__(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride,
+            padding,
+            dilation,
+            groups,
+            bias,
+            padding_mode,
+        )
+
         self.scale = scale
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
 
     def forward(self, x):
         x = F.upsample(x, scale_factor=self.scale, mode="nearest")
-        return self.conv(x)
+        return super().forward(x)
 
     def get_output_shape(self, in_shape: Iterable[int]):
         """
@@ -173,21 +183,10 @@ class UpConv2dConnection(AbstractConnection, nn.Module):
         H_in *= self.scale
         W_in *= self.scale
 
-        assert C_in == self.conv.in_channels, "Input channels must match"
+        return super().get_output_shape((N, C_in, H_in, W_in))
 
-        C_out = self.conv.out_channels
-        H_out = int(
-            (H_in - self.conv.kernel_size[0] + 2 * self.conv.padding[0])
-            / self.conv.stride[0]
-            + 1
-        )
-        W_out = int(
-            (W_in - self.conv.kernel_size[1] + 2 * self.conv.padding[1])
-            / self.conv.stride[1]
-            + 1
-        )
 
-        return (N, C_out, H_out, W_out)
+################## BELOW HERE HAS NOT BEEN RE-DONE ##############################
 
 
 class MaxPool2dConnection(AbstractConnection):

@@ -105,7 +105,6 @@ class Network(torch.nn.Module):
         self.layers_out = {}
 
         self.connections = torch.nn.ModuleDict()
-        self.connection_name_map = {}
 
         self.monitors = OrderedDict()
 

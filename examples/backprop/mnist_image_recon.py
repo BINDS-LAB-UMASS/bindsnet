@@ -52,7 +52,7 @@ down_nodes = [
         lbound=-1.0,
         rest=0.0,
         tc_decay=float(np.exp(-time_step / tau_mem)),
-        scale=10.,
+        scale=10.0,
     ),
     N.LIFNodes(
         thresh=1.0,
@@ -60,7 +60,7 @@ down_nodes = [
         lbound=-1.0,
         rest=0.0,
         tc_decay=float(np.exp(-time_step / tau_mem)),
-        scale=10.,
+        scale=10.0,
     ),
 ]
 
@@ -73,7 +73,7 @@ up_nodes = [
         lbound=-1.0,
         rest=0.0,
         tc_decay=float(np.exp(-time_step / tau_mem)),
-        scale=10.,
+        scale=10.0,
     ),
     N.LIFNodes(
         thresh=1.0,
@@ -81,7 +81,7 @@ up_nodes = [
         lbound=-1.0,
         rest=0.0,
         tc_decay=float(np.exp(-time_step / tau_mem)),
-        scale=10.,
+        scale=10.0,
     ),
     N.LIFNodes(
         thresh=1.0,
@@ -89,7 +89,7 @@ up_nodes = [
         lbound=-1.0,
         rest=0.0,
         tc_decay=float(np.exp(-time_step / tau_mem)),
-        scale=10.,
+        scale=10.0,
     ),
 ]
 
@@ -122,10 +122,7 @@ for i, un in enumerate(up_nodes):
     pn = cn
 
     with torch.no_grad():
-        try:
-            up_conv[i].weight *= 40.0
-        except:
-            up_conv[i].conv.weight *= 40.0
+        up_conv[i].weight *= 40.0
 
 network.add_monitor(Monitor(up_nodes[-1], ["s", "v"]), "M")
 
