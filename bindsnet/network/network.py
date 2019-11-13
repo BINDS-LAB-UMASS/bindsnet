@@ -86,7 +86,7 @@ class Network(torch.nn.Module):
         dt: float = 1.0,
         batch_size: int = 1,
         learning: bool = True,
-        reward_fn: Optional[Type[AbstractReward]] = None,
+        reward_fn = None,
     ) -> None:
         # language=rst
         """

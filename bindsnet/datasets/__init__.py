@@ -1,6 +1,6 @@
 from .torchvision_wrapper import create_torchvision_dataset_wrapper
 from .spoken_mnist import SpokenMNIST
-from .davis import Davis
+# from .davis import Davis
 
 from .collate import time_aware_collate
 from .dataloader import DataLoader

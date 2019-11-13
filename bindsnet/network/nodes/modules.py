@@ -105,7 +105,7 @@ class IFNodes(Nodes):
         reset: Union[float, torch.Tensor] = -65.0,
         lbound: Union[float, torch.Tensor] = -1e5,
         scale: Union[float, torch.Tensor] = 100.0,
-        **kwargs,
+        **kwargs
     ) -> None:
         # language=rst
         """
@@ -176,7 +176,7 @@ class LIFNodes(Nodes):
         rest: Union[float, torch.Tensor] = -65.0,
         tc_decay: Union[float, torch.Tensor] = 100.0,
         scale: Union[float, torch.Tensor] = 100.0,
-        **kwargs,
+        **kwargs
     ) -> None:
         # language=rst
         """

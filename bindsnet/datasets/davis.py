@@ -49,7 +49,7 @@ class Davis(torch.utils.data.Dataset):
         super().__init__()
 
         if subset not in self.SUBSET_OPTIONS:
-            raise ValueError(f"Subset should be in {self.SUBSET_OPTIONS}")
+            raise ValueError("Subset should be in %s" % self.SUBSET_OPTIONS)
         if task not in self.TASKS:
             raise ValueError(f"The only tasks that are supported are {self.TASKS}")
         if resolution not in self.RESOLUTION_OPTIONS:

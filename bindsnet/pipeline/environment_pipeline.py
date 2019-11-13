@@ -21,7 +21,7 @@ class EnvironmentPipeline(BasePipeline):
         network: Network,
         environment: Environment,
         action_function: Optional[Callable] = None,
-        **kwargs,
+        **kwargs
     ):
         # language=rst
         """

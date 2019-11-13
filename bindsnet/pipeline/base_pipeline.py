@@ -57,14 +57,14 @@ class BasePipeline:
                     Monitor(
                         self.network.layers[l], "s", self.plot_config["data_length"]
                     ),
-                    name=f"{l}_spikes",
+                    name="%s_spikes" % l,
                 )
                 if hasattr(self.network.layers[l], "v"):
                     self.network.add_monitor(
                         Monitor(
                             self.network.layers[l], "v", self.plot_config["data_length"]
                         ),
-                        name=f"{l}_voltages",
+                        name="%s_voltages" % l,
                     )
 
         self.plot_interval = self.plot_config["data_step"]
@@ -123,7 +123,7 @@ class BasePipeline:
             and self.step_count % self.print_interval == 0
         ):
             print(
-                f"Iteration: {self.step_count} (Time: {time.time() - self.clock:.4f})"
+                "Iteration: %d (Time: %f)" % (self.step_count, time.time() - self.clock)
             )
             self.clock = time.time()
 
@@ -146,7 +146,7 @@ class BasePipeline:
         :return: A dictionary containing all spike monitors from the network.
         """
         return {
-            l: self.network.monitors[f"{l}_spikes"].get("s")
+            l: self.network.monitors["%s_spikes" % l].get("s")
             for l in self.network.layers
         }
 
@@ -163,7 +163,7 @@ class BasePipeline:
         threshold_value = {}
         for l in self.network.layers:
             if hasattr(self.network.layers[l], "v"):
-                voltage_record[l] = self.network.monitors[f"{l}_voltages"].get("v")
+                voltage_record[l] = self.network.monitors["%s_voltages" % l].get("v")
             if hasattr(self.network.layers[l], "thresh"):
                 threshold_value[l] = self.network.layers[l].thresh
 
