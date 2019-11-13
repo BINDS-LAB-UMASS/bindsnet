@@ -31,7 +31,7 @@ def recursive_to(item, device):
     elif isinstance(item, container_abcs.Sequence):
         return [recursive_to(i, device) for i in item]
     else:
-        raise NotImplementedError(f"Target type {type(item)} not supported.")
+        raise NotImplementedError("Target type %s not supported." % str(type(item)))
 
 
 class CheckpointSaver:
@@ -93,7 +93,11 @@ class CheckpointSaver:
         if checkpoint_file is None:
             print("Loading latest checkpoint [" + self.latest_checkpoint + "]")
             checkpoint_file = self.latest_checkpoint
-        checkpoint = torch.load(checkpoint_file)
+
+        if torch.cuda.is_available():
+            checkpoint = torch.load(checkpoint_file)
+        else:
+            checkpoint = torch.load(checkpoint_file, map_location=torch.device('cpu'))
 
         for model in models:
             if model in checkpoint["models"]:
