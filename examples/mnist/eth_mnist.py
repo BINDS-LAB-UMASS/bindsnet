@@ -49,7 +49,7 @@ parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
 parser.set_defaults(plot=False, gpu=False, train=True)
 
-args = parser.parse_args()
+args, _ = parser.parse_known_args()
 
 seed = args.seed
 n_neurons = args.n_neurons
