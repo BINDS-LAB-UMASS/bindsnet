@@ -266,7 +266,7 @@ for epoch in range(n_epochs):
             }
             voltages = {"Ae": exc_voltages, "Ai": inh_voltages}
             inpt_axes, inpt_ims = plot_input(
-                image, inpt, label=labels[step], axes=inpt_axes, ims=inpt_ims
+                image, inpt, label=labels[step * batch_size % update_interval], axes=inpt_axes, ims=inpt_ims
             )
             spike_ims, spike_axes = plot_spikes(
                 spikes_, ims=spike_ims, axes=spike_axes
