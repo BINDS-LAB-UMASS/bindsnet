@@ -482,15 +482,15 @@ class LocallyConnectedNetwork(Network):
         self.wmax = wmax
         self.norm = norm
 
-        if kernel_size == input_shape:
+        if kernel_size == input_shape[1:]:
             conv_size = [1, 1]
         else:
             conv_size = (
-                int((input_shape[0] - kernel_size[0]) / stride[0]) + 1,
-                int((input_shape[1] - kernel_size[1]) / stride[1]) + 1,
+                int((input_shape[1] - kernel_size[0]) / stride[0]) + 1,
+                int((input_shape[2] - kernel_size[1]) / stride[1]) + 1,
             )
 
-        input_layer = Input(n=self.n_inpt, traces=True, tc_trace=20.0)
+        input_layer = Input(n=self.n_inpt, shape=input_shape, traces=True, tc_trace=20.0)
 
         output_layer = DiehlAndCookNodes(
             n=self.n_filters * conv_size[0] * conv_size[1],
@@ -516,7 +516,7 @@ class LocallyConnectedNetwork(Network):
             wmin=wmin,
             wmax=wmax,
             norm=norm,
-            input_shape=input_shape,
+            input_shape=input_shape[1:],
         )
 
         w = torch.zeros(n_filters, *conv_size, n_filters, *conv_size)
