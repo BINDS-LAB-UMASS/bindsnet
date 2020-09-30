@@ -29,7 +29,6 @@ class Permute(nn.Module):
         :param dims: Ordering of dimensions for permutation.
         """
         super(Permute, self).__init__()
-
         self.dims = dims
 
     def forward(self, x):
@@ -40,7 +39,8 @@ class Permute(nn.Module):
         :param x: Input tensor to permute.
         :return: Permuted input tensor.
         """
-        return x.permute(*self.dims).contiguous()
+        dims = (0,) + tuple(np.array(self.dims) + 1)
+        return x.permute(*dims).contiguous()
 
 
 class FeatureExtractor(nn.Module):
@@ -70,12 +70,12 @@ class FeatureExtractor(nn.Module):
         """
         activations = {"input": x}
         for name, module in self.submodule._modules.items():
+            
             if isinstance(module, nn.Linear):
                 x = x.view(-1, module.in_features)
 
             x = module(x)
             activations[name] = x
-
         return activations
 
 
@@ -297,7 +297,29 @@ class PermuteConnection(topology.AbstractConnection):
         :param s: Input.
         :return: Permuted input.
         """
-        return s.permute(self.dims).float()
+        dims = (0,) + tuple(np.array(self.dims) + 1)
+        return s.permute(dims).float()
+
+    def update(self, **kwargs) -> None:
+        # language=rst
+        """
+        Compute connection's update rule.
+        """
+        super().update(**kwargs)
+    
+    def normalize(self) -> None:
+        # language=rst
+        """
+        No weights -> no normalization.
+        """
+        pass
+
+    def reset_state_variables(self) -> None:
+        # language=rst
+        """
+        Contains resetting logic for the connection.
+        """
+        super().reset_state_variables()
 
 
 class ConstantPad2dConnection(topology.AbstractConnection):
@@ -349,6 +371,27 @@ class ConstantPad2dConnection(topology.AbstractConnection):
         """
         return F.pad(s, self.padding).float()
 
+    def update(self, **kwargs) -> None:
+        # language=rst
+        """
+        Compute connection's update rule.
+        """
+        super().update(**kwargs)
+    
+    def normalize(self) -> None:
+        # language=rst
+        """
+        No weights -> no normalization.
+        """
+        pass
+
+    def reset_state_variables(self) -> None:
+        # language=rst
+        """
+        Contains resetting logic for the connection.
+        """
+        super().reset_state_variables()
+
 
 def data_based_normalization(
     ann: Union[nn.Module, str], data: torch.Tensor, percentile: float = 99.9
@@ -384,45 +427,22 @@ def data_based_normalization(
     prev_factor = 1
     for name, module in ann._modules.items():
         if isinstance(module, nn.Sequential):
-
             extractor2 = FeatureExtractor(module)
             all_activations2 = extractor2.forward(data)
             for name2, module2 in module.named_children():
                 activations = all_activations2[name2]
-
-                if isinstance(module2, nn.ReLU):
-                    if prev_module is not None:
-                        scale_factor = np.percentile(activations.cpu(), percentile)
-
-                        prev_module.weight *= prev_factor / scale_factor
-                        prev_module.bias /= scale_factor
-
-                        prev_factor = scale_factor
-
-                elif isinstance(module2, nn.Linear) or isinstance(module2, nn.Conv2d):
-                    prev_module = module2
-
-        if isinstance(module2, nn.Linear):
-                if prev_module is not None:
+                if isinstance(module2, nn.Linear) or isinstance(module2, nn.Conv2d):
                     scale_factor = np.percentile(activations.cpu(), percentile)
-                    prev_module.weight *= prev_factor / scale_factor
-                    prev_module.bias /= scale_factor
+                    module2.weight *= prev_factor / scale_factor
+                    module2.bias /= scale_factor
                     prev_factor = scale_factor
-
-        else:
+        else:            
             activations = all_activations[name]
-            if isinstance(module, nn.ReLU):
-                if prev_module is not None:
+            if isinstance(module, nn.Linear) or isinstance(module, nn.Conv2d):
                     scale_factor = np.percentile(activations.cpu(), percentile)
-
-                    prev_module.weight *= prev_factor / scale_factor
-                    prev_module.bias /= scale_factor
-
+                    module.weight *= prev_factor / scale_factor
+                    module.bias /= scale_factor
                     prev_factor = scale_factor
-
-            elif isinstance(module, nn.Linear) or isinstance(module, nn.Conv2d):
-                prev_module = module
-
     return ann
 
 
@@ -573,7 +593,6 @@ def ann_to_snn(
         ann = data_based_normalization(
             ann=ann, data=data.detach(), percentile=percentile
         )
-
     snn = Network()
 
     input_layer = nodes.Input(shape=input_shape)
