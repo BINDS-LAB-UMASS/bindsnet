@@ -578,10 +578,12 @@ def ann_to_snn(
         in original ANN.
     :return: Spiking neural network implemented in PyTorch.
     """
+    '''
     if isinstance(ann, str):
         ann = torch.load(ann)
     else:
         ann = deepcopy(ann)
+    '''
 
     assert isinstance(ann, nn.Module)
 
