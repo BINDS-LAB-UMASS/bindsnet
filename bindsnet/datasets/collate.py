@@ -8,7 +8,14 @@ Modifications exist to have [time, batch, n_0, ... n_k] instead of batch in dime
 """
 
 import torch
-from torch._six import container_abcs, string_classes, int_classes
+
+# https://github.com/pytorch/pytorch/pull/94709#issuecomment-1461471006
+try:
+    from torch._six import container_abcs, string_classes, int_classes
+except ImportError:
+    int_classes = int
+    string_classes = str
+    import collections.abc as container_abcs
 
 from torch.utils.data._utils import collate as pytorch_collate
 

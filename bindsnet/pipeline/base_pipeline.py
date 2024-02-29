@@ -2,7 +2,13 @@ import time
 from typing import Tuple, Dict, Any
 
 import torch
-from torch._six import container_abcs, string_classes
+
+# https://github.com/pytorch/pytorch/pull/94709#issuecomment-1461471006
+try:
+    from torch._six import container_abcs, string_classes
+except ImportError:
+    string_classes = str
+    import collections.abc as container_abcs
 
 from ..network import Network
 from ..network.monitors import Monitor
